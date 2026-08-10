@@ -870,31 +870,56 @@ collected under a fixed, known-good configuration. The anchor is:
 
 - **metric** = the column sum of `pmu_idc_aic_vec_busy_o` (the A5
   `PIPE_UTILIZATION` vector-pipe busy counter) across every task row of an
-  operator's `pmu.csv`. Informally "rvec_busy" = total vector-pipe busy
-  cycles for that operator. `pmu_total_cycles` is summed alongside for
-  context (so vec_busy / total_cycles gives a vector-utilisation ratio).
+  operator's `pmu.csv` — total vector-pipe busy cycles for that operator.
+  `pmu_total_cycles` is summed alongside for context (so vec_busy /
+  total_cycles gives a vector-utilisation ratio).
 - **configuration** = `--no-fusion --pmu 2 -p a5 -d <free>` — the same
   fusion-off setup under which all 27 ops pass precision (§10). This is the
   baseline default; fusion is OFF so the numbers reflect unfused tiles.
 - **scope** = the 27 single-card operators from §5, run one at a time.
 
-`scripts/collect_pmu_baseline.py` automates the whole sweep. It calls
-`scripts/run_op_pmu.py` once per op (so PMU injection and `--no-fusion`
-patching reuse the verified single-op path), archives each raw `pmu.csv` as
-`baselines/<tag>/<op>.pmu.csv`, and writes a summary table:
+> **Metric note — do not confuse with the PTOAS lab's `rvec_busy`.** The
+> PTOAS `dsv4-vmi-lowering-lab` has a *different* vec-busy metric,
+> `rvec_veccore0_busy_cycle`, produced by the VMI **sim** path's
+> `core0_summary_log`. That is a simulator statistic on the VPTO/bisheng
+> route, not a real-card counter. This baseline uses the **real A5 PMU**
+> counter `pmu_idc_aic_vec_busy_o` — same semantics (vector-pipe busy
+> cycles), different source (hardware vs simulator). When someone says
+> "rvec_busy", confirm which one: the lab's sim metric is not comparable
+> to this baseline. See the two-route note in §11.2.
 
-```bash
-source .env_a5.sh
-# full baseline (27 ops, ~6 min on a free card)
-python scripts/collect_pmu_baseline.py -p a5 -d 6
-# re-run a subset into a different tag (e.g. new PTOAS version)
-python scripts/collect_pmu_baseline.py -p a5 -d 6 --tag new_ptoas_v0.55 --only gate,rmsnorm
-# compare a new collection against the baseline
-diff <(cut -d, -f1,4 baselines/nofusion_a5_pmu2/baseline_summary.csv | sort) \
-     <(cut -d, -f1,4 baselines/new_ptoas_v0.55/baseline_summary.csv | sort)
-```
+### 11.1 The two compile routes (why the baseline is apples-to-apples)
 
-### 11.1 Current baseline — `nofusion_a5_pmu2`
+There are two back-end routes from the shared front-end `.pto` to a
+loadable kernel object. The `.pto` (PyPTO IR) is **identical** in both;
+only the post-`.pto` lowering differs:
+
+| | Route 1 — EmitC (current default) | Route 2 — VPTO (new PTOAS) |
+| --- | --- | --- |
+| lowering | ptoas EmitC → `.cpp` | ptoas VPTO → LLVM IR |
+| object | `g++`/`clang` → `.o`/`.so` | `bisheng` → `.o` |
+| ptoas flags | `--enable-insert-sync --pto-level=level3 --pto-arch a5` | adds `--pto-backend=vpto --enable-vmi --enable-op-fusion=true --enable-vecscope-mem-bar` |
+| runtime | simpler → A5 real card | simpler → A5 real card |
+| perf metric | `pmu_idc_aic_vec_busy_o` (real PMU) | `pmu_idc_aic_vec_busy_o` (real PMU) |
+
+Both routes converge on a `.o`/`.so` written next to each kernel, which
+`compile_and_assemble` picks up to rebuild the `ChipCallable`. The simpler
+runtime is **binary-format-agnostic**: it loads whatever object is on disk
+that exports the expected symbols/manifest — it does not care whether that
+object came from `g++` (EmitC) or `bisheng` (VPTO). So a Route-2 build
+runs through the **same golden harness** (§4) and is measured by the
+**same real-PMU counter** as Route-1. The baseline in §11.2 (Route-1,
+fusion-off) is therefore directly comparable to a future Route-2
+collection on the `pmu_idc_aic_vec_busy_o` axis.
+
+The VPTO route is documented in the PTOAS repo (`README-vmi-membar-bishengvfoff.md`)
+and exercised by `dsv4-vmi-lowering-lab/` — which currently measures it
+via the **sim** `rvec_veccore0_busy_cycle`, a separate axis from this
+real-card baseline. The lab exists to develop the VMI lowering; the
+pypto-lib baseline here is the real-card anchor for the eventual
+end-to-end comparison.
+
+### 11.2 Current baseline — `nofusion_a5_pmu2`
 
 Collected 2026-08-10, card 6, `--pmu 2 --no-fusion`. 27/27 PASS, 342.5 s.
 All 27 raw `pmu.csv` files are archived under
