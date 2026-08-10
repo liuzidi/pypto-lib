@@ -4,6 +4,13 @@
 set and compositions as [V4-Flash](deepseek_v4_flash_mtp.md), built for the
 larger **DeepSeek-V4-Pro** checkpoint.
 
+> **Running the operators:** For step-by-step environment setup, the
+> single-card operator list, PMU collection, and the op-fusion finding
+> (all 27 operators pass with `--no-fusion`), see
+> [Running DeepSeek-V4 Pro single-card operators on A5](../run-deepseek-v4-pro-single-ops.md)
+> and its quick-reference companion
+> [DSV4 Pro runbook](../dsv4-pro-runbook.md).
+
 ## Deployment configuration
 
 The `PRO` preset in [config.py](../../models/deepseek_v4_pro/config.py) mirrors
