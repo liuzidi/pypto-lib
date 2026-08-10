@@ -16,6 +16,7 @@ Usage:
     python scripts/run_op_pmu.py gate -p a5 -d 6 --pmu 0          # PMU off (sanity)
     python scripts/run_op_pmu.py gate -p a5 -d 6 --no-fusion      # disable op-fusion
     python scripts/run_op_pmu.py gate -p a5 -d 6 --pmu 2 --no-fusion  # both at once
+    python scripts/run_op_pmu.py gate -p a5 -d 6 --pmu 2 --keep-csv  # also write <op>_pmu.csv
 
 <op> is the operator module name under models/deepseek_v4_pro/, with or
 without the ``.py`` suffix. Extra args after ``--`` are forwarded to the
@@ -23,6 +24,11 @@ operator's own argparse (e.g. ``-- --layer-id 5 --num-tokens 4``).
 
 Output: prints the run result and the path to ``pmu.csv``:
     <work_dir>/dfx_outputs/pmu.csv   (only when --pmu > 0)
+
+By default the pmu.csv is NOT copied next to the operator (to avoid
+scattering transient files across a 27-op sweep); add --keep-csv to also
+write <op>_pmu.csv there. The canonical archived baselines live under
+baselines/ (see scripts/collect_pmu_baseline.py).
 """
 from __future__ import annotations
 
@@ -101,6 +107,10 @@ def main() -> int:
     ap.add_argument("--no-fusion", action="store_true", default=False,
                     help="disable ptoas A5 tile op-fusion "
                          "(appends --enable-op-fusion=false to ptoas)")
+    ap.add_argument("--keep-csv", action="store_true", default=False,
+                    help="also copy pmu.csv next to the operator as "
+                         "<op>_pmu.csv (default OFF to avoid polluting the "
+                         "operator directory; build_output keeps the original)")
     known, extra = ap.parse_known_args()
 
     if known.no_fusion:
@@ -138,22 +148,31 @@ def main() -> int:
     except SystemExit as e:
         # operators raise SystemExit(1) on FAIL; PMU csv still produced.
         code = int(e.code) if isinstance(e.code, int) else (0 if not e.code else 1)
-        return _report_pmu(mod_path, known.pmu, failed=code != 0)
-    return _report_pmu(mod_path, known.pmu, failed=False)
+        return _report_pmu(mod_path, known.pmu, failed=code != 0,
+                            keep_csv=known.keep_csv)
+    return _report_pmu(mod_path, known.pmu, failed=False,
+                        keep_csv=known.keep_csv)
 
 
-def _report_pmu(mod_path: pathlib.Path, pmu: int, *, failed: bool) -> int:
-    """Locate the most recent pmu.csv under build_output and print it."""
+def _report_pmu(mod_path: pathlib.Path, pmu: int, *, failed: bool,
+                 keep_csv: bool = False) -> int:
+    """Locate the most recent pmu.csv under build_output and print it.
+
+    The original pmu.csv always lives under build_output/ (gitignored). Only
+    when --keep-csv is set do we also copy it next to the operator as
+    <op>_pmu.csv; otherwise we leave the operator directory untouched (a
+    27-op sweep would otherwise scatter 27 transient copies there).
+    """
     bo = PYPTO_LIB_ROOT / "build_output"
     pmus = sorted(bo.glob("**/dfx_outputs/pmu.csv"),
                    key=lambda p: p.stat().st_mtime, reverse=True) if bo.is_dir() else []
     if pmu > 0 and pmus:
         print(f"[op_pmu] pmu.csv: {pmus[0]}", flush=True)
-        # copy next to the operator for visibility (build_output is gitignored)
-        dst = mod_path.with_name(f"{mod_path.stem}_pmu.csv")
-        import shutil
-        shutil.copy2(pmus[0], dst)
-        print(f"[op_pmu] copied to: {dst}", flush=True)
+        if keep_csv:
+            dst = mod_path.with_name(f"{mod_path.stem}_pmu.csv")
+            import shutil
+            shutil.copy2(pmus[0], dst)
+            print(f"[op_pmu] copied to: {dst}", flush=True)
     elif pmu > 0:
         print("[op_pmu] WARNING: no pmu.csv found under build_output/", flush=True)
     print(f"[op_pmu] {'operator FAILED (see output above)' if failed else 'operator passed'}",

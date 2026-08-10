@@ -94,17 +94,24 @@ def parse_args() -> argparse.Namespace:
 
 
 def run_one(op: str, args: argparse.Namespace) -> tuple[int, str]:
-    """Run run_op_pmu.py for one op. Returns (exit_code, pmu_csv_path_or_empty)."""
+    """Run run_op_pmu.py for one op. Returns (exit_code, pmu_csv_path_or_empty).
+
+    We do NOT rely on run_op_pmu.py copying pmu.csv next to the operator (that
+    default was removed to avoid polluting the operator directory across a
+    27-op sweep). Instead we glob build_output for the newest pmu.csv — the
+    same lookup run_op_pmu.py itself uses to report the path.
+    """
     cmd = [sys.executable, str(RUN_OP_PMU), op,
            "-p", args.platform, "-d", str(args.device),
            "--pmu", str(args.pmu)]
     if args.no_fusion:
         cmd.append("--no-fusion")
     proc = subprocess.run(cmd, cwd=str(PYPTO_LIB_ROOT))
-    # run_op_pmu copies pmu.csv next to the operator as <op>_pmu.csv when pmu>0.
-    op_csv = MODEL_DIR / f"{op}_pmu.csv"
-    csv_path = str(op_csv) if op_csv.is_file() else ""
-    return proc.returncode, csv_path
+    bo = PYPTO_LIB_ROOT / "build_output"
+    pmus = (sorted(bo.glob("**/dfx_outputs/pmu.csv"),
+                   key=lambda p: p.stat().st_mtime, reverse=True)
+            if bo.is_dir() else [])
+    return proc.returncode, (str(pmus[0]) if pmus else "")
 
 
 def sum_columns(pmu_csv: pathlib.Path) -> dict | None:
