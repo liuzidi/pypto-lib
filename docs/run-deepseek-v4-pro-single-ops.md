@@ -780,6 +780,93 @@ python scripts/run_op_pmu.py gate -p a5 -d 6 --pmu 2 --no-fusion
 
 ---
 
+## 11. PMU baseline collection (vec_busy anchor for PTOAS comparison)
+
+The per-task PMU data from §9 becomes a **performance baseline** once
+collected under a fixed, known-good configuration. The anchor is:
+
+- **metric** = the column sum of `pmu_idc_aic_vec_busy_o` (the A5
+  `PIPE_UTILIZATION` vector-pipe busy counter) across every task row of an
+  operator's `pmu.csv`. Informally "rvec_busy" = total vector-pipe busy
+  cycles for that operator. `pmu_total_cycles` is summed alongside for
+  context (so vec_busy / total_cycles gives a vector-utilisation ratio).
+- **configuration** = `--no-fusion --pmu 2 -p a5 -d <free>` — the same
+  fusion-off setup under which all 27 ops pass precision (§10). This is the
+  baseline default; fusion is OFF so the numbers reflect unfused tiles.
+- **scope** = the 27 single-card operators from §5, run one at a time.
+
+`scripts/collect_pmu_baseline.py` automates the whole sweep. It calls
+`scripts/run_op_pmu.py` once per op (so PMU injection and `--no-fusion`
+patching reuse the verified single-op path), archives each raw `pmu.csv` as
+`baselines/<tag>/<op>.pmu.csv`, and writes a summary table:
+
+```bash
+source .env_a5.sh
+# full baseline (27 ops, ~6 min on a free card)
+python scripts/collect_pmu_baseline.py -p a5 -d 6
+# re-run a subset into a different tag (e.g. new PTOAS version)
+python scripts/collect_pmu_baseline.py -p a5 -d 6 --tag new_ptoas_v0.55 --only gate,rmsnorm
+# compare a new collection against the baseline
+diff <(cut -d, -f1,4 baselines/nofusion_a5_pmu2/baseline_summary.csv | sort) \
+     <(cut -d, -f1,4 baselines/new_ptoas_v0.55/baseline_summary.csv | sort)
+```
+
+### 11.1 Current baseline — `nofusion_a5_pmu2`
+
+Collected 2026-08-10, card 6, `--pmu 2 --no-fusion`. 27/27 PASS, 342.5 s.
+All 27 raw `pmu.csv` files are archived under
+`baselines/nofusion_a5_pmu2/`. Column of record: `pmu_idc_aic_vec_busy_o`.
+
+| op | pass | rows | vec_busy_sum | total_cycles_sum |
+|---|---|---:|---:|---:|
+| rmsnorm | PASS | 16 | 471173 | 729191 |
+| qkv_proj_rope | PASS | 154 | 3433762 | 58334181 |
+| mtp_projection | PASS | 945 | 5502419 | 107025339 |
+| gate | PASS | 59 | 51333 | 1432828 |
+| expert_shared | PASS | 57 | 36650 | 1927789 |
+| expert_routed | PASS | 693 | 1743072 | 68720009 |
+| hc_pre | PASS | 193 | 1026908 | 2555553 |
+| hc_post | PASS | 8 | 62521 | 162571 |
+| hc_head | PASS | 13 | 33926 | 184343 |
+| decode_attention_swa | PASS | 630 | 678526 | 16668330 |
+| decode_attention_csa | PASS | 767 | 1832676 | 24860872 |
+| decode_attention_hca | PASS | 659 | 948846 | 19039515 |
+| decode_sparse_attn | PASS | 659 | 948846 | 19039515 |
+| decode_sparse_attn_swa | PASS | 659 | 948846 | 19039515 |
+| decode_sparse_attn_hca | PASS | 659 | 948846 | 19039515 |
+| decode_compressor_ratio4 | PASS | 18 | 18564 | 781979 |
+| decode_compressor_ratio128 | PASS | 10 | 57509 | 452514 |
+| decode_indexer | PASS | 116 | 377340 | 5157150 |
+| decode_indexer_compressor | PASS | 12 | 20072 | 341138 |
+| prefill_attention_swa | PASS | 1425 | 14752015 | 146682011 |
+| prefill_attention_csa | PASS | 2650 | 18914799 | 207925060 |
+| prefill_attention_hca | PASS | 1579 | 15089681 | 149424154 |
+| prefill_sparse_attn | PASS | 1579 | 15089681 | 149424154 |
+| prefill_compressor_ratio4 | PASS | 229 | 859370 | 8481456 |
+| prefill_compressor_ratio128 | PASS | 156 | 340879 | 2247642 |
+| prefill_indexer | PASS | 942 | 3208094 | 53361827 |
+| prefill_indexer_compressor | PASS | 653 | 714578 | 4076521 |
+
+Notes for comparison:
+
+- **Equal-value groups are expected.** Several ops share an identical
+  `vec_busy_sum` / `total_cycles_sum` pair
+  (`decode_attention_hca` = `decode_sparse_attn*` = 948846 / 19039515;
+  `prefill_attention_hca` = `prefill_sparse_attn` = 15089681 / 149424154).
+  In the current single-card config those ops dispatch the same underlying
+  kernel/task graph, so their counters are identical by construction. Under
+  a new PTOAS these groups move together — treat them as one signal.
+- **`rows` is the task count**, one PMU CSV row per kernel invocation. It
+  is part of the baseline: a new PTOAS that fuses/splits tasks changes
+  `rows`, which changes the sum even if per-task behaviour is unchanged.
+  Compare `vec_busy_sum` only when `rows` matches; otherwise compare the
+  per-task mean (`vec_busy_sum / rows`) and flag the row-count delta.
+- **Fusion must stay OFF on both sides.** The baseline is fusion-off; a
+  fusion-on comparison run is a different baseline tag, not a delta against
+  this one.
+
+---
+
 ## Appendix A — observed results (this host, A5)
 
 Two sweeps of all 27 single-card operators on the same host:

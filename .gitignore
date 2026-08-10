@@ -23,6 +23,11 @@ build_output/
 pa_build/
 site/
 
+# Per-op PMU CSVs copied next to an operator by scripts/run_op_pmu.py —
+# transient copies of build_output/<run>/dfx_outputs/pmu.csv. The canonical
+# archived baselines live under baselines/ (tracked).
+models/**/*_pmu.csv
+
 # Virtual environments
 .env/
 .venv/
