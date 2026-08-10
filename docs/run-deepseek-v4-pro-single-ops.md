@@ -888,7 +888,7 @@ collected under a fixed, known-good configuration. The anchor is:
 > "rvec_busy", confirm which one: the lab's sim metric is not comparable
 > to this baseline. See the two-route note in §11.2.
 
-### 11.1 The two compile routes (why the baseline is apples-to-apples)
+### 11.1 The two compile routes (and why Route 2 is not yet loadable)
 
 There are two back-end routes from the shared front-end `.pto` to a
 loadable kernel object. The `.pto` (PyPTO IR) is **identical** in both;
@@ -897,20 +897,43 @@ only the post-`.pto` lowering differs:
 | | Route 1 — EmitC (current default) | Route 2 — VPTO (new PTOAS) |
 | --- | --- | --- |
 | lowering | ptoas EmitC → `.cpp` | ptoas VPTO → LLVM IR |
-| object | `g++`/`clang` → `.o`/`.so` | `bisheng` → `.o` |
-| ptoas flags | `--enable-insert-sync --pto-level=level3 --pto-arch a5` | adds `--pto-backend=vpto --enable-vmi --enable-op-fusion=true --enable-vecscope-mem-bar` |
-| runtime | simpler → A5 real card | simpler → A5 real card |
-| perf metric | `pmu_idc_aic_vec_busy_o` (real PMU) | `pmu_idc_aic_vec_busy_o` (real PMU) |
+| object bytes | `g++`/`clang` → `.o`, then `.text` section extracted → **raw A5 device instructions** (`cache/incore_<id>_<ct>_<name>_a5.bin`) | `bisheng` → **fat-object** `kernel.o` (x86-64 host ELF with a nested device ELF in the `__aicore_rel_binary` section) |
+| ptoas flags | `--enable-insert-sync --pto-level=level3 --pto-arch a5` | step1 `--emit-vpto` adds `--pto-backend=vpto --enable-op-fusion=false --enable-vecscope-mem-bar`; step2 `--pto-backend=vpto` only |
+| runtime load | simpler InCore path: raw bytes → `rtMemcpy` H2D → direct function-pointer call | **not loadable by simpler today** — see §11.3 |
+| perf metric | `pmu_idc_aic_vec_busy_o` (real PMU) | `pmu_idc_aic_vec_busy_o` (real PMU, target) |
 
-Both routes converge on a `.o`/`.so` written next to each kernel, which
-`compile_and_assemble` picks up to rebuild the `ChipCallable`. The simpler
-runtime is **binary-format-agnostic**: it loads whatever object is on disk
-that exports the expected symbols/manifest — it does not care whether that
-object came from `g++` (EmitC) or `bisheng` (VPTO). So a Route-2 build
-runs through the **same golden harness** (§4) and is measured by the
-**same real-PMU counter** as Route-1. The baseline in §11.2 (Route-1,
-fusion-off) is therefore directly comparable to a future Route-2
-collection on the `pmu_idc_aic_vec_busy_o` axis.
+The two routes do **not** converge on the same on-disk byte format, and the
+simpler runtime is **not** binary-format-agnostic:
+
+- **Route 1** ends in raw device instruction bytes (`incore_*_a5.bin`,
+  e.g. `10 01 c2 0c …` — no ELF header). simpler loads these via its InCore
+  path: `upload_chip_callable_buffer` does an `rtMemcpy` H2D of the raw
+  bytes, and per-kernel dispatch in `aicore_executor.cpp` is a direct
+  function-pointer call (`UnifiedKernelFunc kernel =
+  (UnifiedKernelFunc)payload->function_bin_addr; kernel(args);`) into those
+  raw bytes. The ELF step that remains is only the *executor* launch
+  (`launch_aicore_kernel`: `rtDevBinary_t{RT_DEV_BINARY_MAGIC_ELF}` +
+  `rtRegisterAllKernel` + `rtKernelLaunchWithHandleV2`), which boots a
+  persistent AICore scheduler loop — it does not load individual kernels.
+- **Route 2** ends in a bisheng fat-object whose `__aicore_rel_binary`
+  section begins with the ELF magic (`7f 45 4c 46`) — a nested device ELF,
+  not raw instructions. Its host-side `.text` is a 1-byte `c3 ret` stub
+  (`cceModuleCtor`). simpler's `extract_text_section` reads **only** the
+  `.text` section (hardcoded section name), so on a Route-2 object it
+  would extract that 1-byte stub, not the device code. And the InCore
+  function-pointer dispatch cannot execute a nested ELF. simpler has **no
+  CANN module-load path** today (no `aclrtModuleLoad` /
+  `__cce_rtKernelLaunchWithFlagV2` / `cceModuleCtor` /
+  `__aicore_rel_binary` references in the onboard runtime).
+
+So a Route-2 build does **not** run through the same golden harness
+out-of-the-box: simpler cannot load the bisheng fat-object as-is. Making
+Route 2 runnable on the real card requires a change to the simpler
+runtime (or its pypto glue) to add a CANN module-load path — see §11.3.
+The **perf metric** is the same counter on both routes, so once Route 2
+is loadable the `pmu_idc_aic_vec_busy_o` axis is directly comparable;
+the baseline in §11.2 (Route-1, fusion-off) is the real-card anchor for
+that eventual comparison.
 
 The VPTO route is documented in the PTOAS repo (`README-vmi-membar-bishengvfoff.md`)
 and exercised by `dsv4-vmi-lowering-lab/` — which currently measures it
@@ -972,6 +995,38 @@ Notes for comparison:
 - **Fusion must stay OFF on both sides.** The baseline is fusion-off; a
   fusion-on comparison run is a different baseline tag, not a delta against
   this one.
+
+### 11.3 Making Route 2 loadable — the simpler runtime gap
+
+§11.1 established that Route 2's bisheng fat-object is byte-incompatible
+with simpler's Route-1 raw-bytes InCore path. Closing that gap is a change
+to the **simpler runtime** (a pypto submodule), not to this repo. The two
+places simpler's kernel-loading code branches:
+
+1. **Seam 1 — the executor launch** (`device_runner_base.cpp ::
+   launch_aicore_kernel`). Today this boots a single persistent AICore
+   scheduler ELF via `rtDevBinary_t{RT_DEV_BINARY_MAGIC_ELF}` +
+   `rtRegisterAllKernel` + `rtKernelLaunchWithHandleV2`, and per-kernel
+   dispatch is a raw-bytes function-pointer call. This is the cleanest
+   branch point for a CANN module-load alternative: detect a bisheng
+   fat-object (object with a non-empty `__aicore_rel_binary`) and, instead
+   of the raw-bytes H2D + function-pointer path, load it via CANN's
+   `aclrtModuleLoad` / `aclrtModuleGetFunctionByBuf` +
+   `__cce_rtKernelLaunchWithFlagV2` (the path CANN's own `libruntime.so`
+   exposes for `cceModuleCtor`-style objects).
+2. **Seam 2 — per-kernel `resolved_addr_` children**
+   (`chip_callable_layout.h :: patch_chip_callable_scratch_for_device`).
+   Harder: the `resolved_addr_` contract assumes a raw-bytes device
+   address. Reworking it to carry a CANN module-function handle instead
+   would touch the `CoreCallable`/`ChipCallable` FAM structs and every
+   consumer of `binary_data()`/`binary_data_offset()`.
+
+**Status:** design only — no simpler/pypto files have been modified. The
+change is on a dependency and must be approved before any edit to those
+trees. Route 2 is currently runnable end-to-end only inside the PTOAS
+lab's VMI simulator (sim `rvec_veccore0_busy_cycle` axis); the real-card
+`pmu_idc_aic_vec_busy_o` comparison against §11.2 is blocked on this
+runtime change.
 
 ---
 
