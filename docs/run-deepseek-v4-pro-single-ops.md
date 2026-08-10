@@ -721,15 +721,98 @@ operator source changed between the failing and passing runs. The
 fix belongs in ptoas's A5 fusion pass; `--no-fusion` is the
 workaround to reproduce and isolate.
 
-### 10.2 How to disable fusion
+### 10.2 Where the ptoas flags come from (the full chain)
+
+A common point of confusion: **pypto never emits `--enable-op-fusion`
+explicitly.** Fusion is the ptoas *binary's* default behaviour when it
+sees `--pto-arch=a5` — `ptoas --help` states it plainly:
+
+> `--enable-op-fusion` — Control A5 tile fusion on level2/level3.
+> **Defaults to enabled on A5, disabled on A3.**
+
+So the flag is absent from the command line precisely *because* it is on
+by default on A5. There is no pypto-side knob turning it on; it turns
+itself on. To turn it *off* you must explicitly emit
+`--enable-op-fusion=false` (§10.3).
+
+The path from `-p a5` on the operator CLI to the real ptoas command line
+is five steps — traced here against an actual `gate` compile (A5, card 6,
+PMU off), with the resulting ptoas invocation logged:
+
+1. **Operator `__main__`** ([`gate.py`](../../models/deepseek_v4_pro/gate.py))
+   parses `-p a5` and puts it in `runtime_cfg`:
+   ```python
+   run_jit(..., runtime_cfg=dict(platform="a5", device_id=6, ...))
+   ```
+
+2. **`run_jit`** ([`golden/runner.py`](../../golden/runner.py)) lifts
+   `platform` out of `runtime_cfg` into the compile `RunConfig`:
+   ```python
+   platform = runtime_cfg.get("platform")   # "a5"
+   cfg["platform"] = platform
+   compiled = fn.compile(*dummy_args, config=RunConfig(**cfg))
+   ```
+
+3. **`platform` → backend handler.** `_backend_for_platform` maps the
+   string to a backend type (`a5` → `BackendType.Ascend950`); that selects
+   the A5 handler in `pypto.backend._backend_core.get_handler()` (C++).
+   The handler owns the arch-specific flag, returned by
+   `get_extra_ptoas_flags()` → `['--pto-arch', 'a5']`.
+
+4. **`_get_ptoas_flags`** assembles the full list
+   (in `pypto/python/pypto/backend/pto_backend.py`, the pypto dependency —
+   not in this repo):
+   ```python
+   flags = ["--enable-insert-sync", f"--pto-level={level}"]   # level3 (PYPTO planner)
+   flags.extend(_backend_core.get_handler().get_extra_ptoas_flags())  # + --pto-arch a5
+   return flags
+   ```
+   Note what is *not* here: no `--enable-op-fusion`. Fusion is left to
+   ptoas's default (on for A5).
+
+5. **`_run_ptoas`** runs the binary with that list appended:
+   ```python
+   cmd = [ptoas_bin, pto_path, "-o", output_path] + flags
+   subprocess.run(cmd, ...)
+   ```
+
+The **real command line** captured for one codegen unit during `gate`
+compile (there are 5 `.pto` units per `gate`; all share the same flags):
+
+```text
+ptoas build_output/_jit_gate_test_*/ptoas/gate.pto \
+    -o .../kernels/aic/gate.cpp \
+    --enable-insert-sync --pto-level=level3 --pto-arch a5
+```
+
+That is the fusion-**ON** (default) invocation. Under `--no-fusion`
+(§10.3), the patched `_get_ptoas_flags` appends one token, and the line
+becomes:
+
+```text
+... --enable-insert-sync --pto-level=level3 --pto-arch a5 --enable-op-fusion=false
+```
+
+Three takeaways for anyone changing PTOAS versions or debugging fusion:
+
+- **`--pto-arch` comes from the handler, not `_get_ptoas_flags`.** If you
+  hand-run ptoas, you must supply `--pto-arch a5` yourself or you get the
+  A3 default (which also means fusion-off — A3 default).
+- **Fusion on/off is invisible in the default flag list.** The only way
+  to *see* it is the absence (on) vs presence (`=false`) of the flag —
+  ptoas's help is the source of truth for the default, not the flag list.
+- **PMU is orthogonal to this whole chain.** `enable_pmu` never reaches
+  ptoas; it rides `runtime_cfg` into simpler's `execute_compiled` at
+  *runtime* (§9). So fusion (compile-time) and PMU (run-time) are
+  independent axes and can be combined freely.
+
+### 10.3 How to disable fusion
 
 The fusion flag is a ptoas CLI argument (`--enable-op-fusion=false`), not
 a `runtime_cfg` DFX flag, so it is not reachable through `run_jit`'s
 `runtime_cfg` like PMU is. pypto builds the ptoas flag list in
-`pypto.backend.pto_backend._get_ptoas_flags` (default: just
-`--enable-insert-sync` + `--pto-level=…` + the backend handler's extras;
-fusion is ON by the ptoas A5 default, no explicit flag needed). To turn it
-off, append `--enable-op-fusion=false` to that list.
+`pypto.backend.pto_backend._get_ptoas_flags` (§10.2); to turn fusion off,
+append `--enable-op-fusion=false` to that list.
 
 The generic wrapper does this for you via `--no-fusion`:
 
@@ -750,7 +833,7 @@ python scripts/run_op_pmu.py gate -p a5 -d 6 --pmu 2 --no-fusion
 `--enable-op-fusion=false` before the operator compiles. It composes with
 `--pmu` (and with operator args after `--`).
 
-### 10.3 When to use it
+### 10.4 When to use it
 
 - **Any precision FAIL** — first re-run with `--no-fusion`. If it flips
   to PASS, the divergence is fusion-induced, and the root cause is in
@@ -765,7 +848,7 @@ python scripts/run_op_pmu.py gate -p a5 -d 6 --pmu 2 --no-fusion
   changes fusion behaviour, compare fusion-on vs fusion-off to tell
   throughput from numerics apart.
 
-### 10.4 Caveats
+### 10.5 Caveats
 
 - **Not a fix, a diagnostic.** Leaving fusion off permanently surrenders
   its throughput benefit. The resolution is to fix the fusion pass in
