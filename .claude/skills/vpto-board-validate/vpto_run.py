@@ -122,6 +122,49 @@ def _run(cmd: list[str], env: dict | None = None, cwd: str | Path | None = None,
     return r
 
 
+# --- route-specific codegen flag sets ---
+# baseline: the original vpto_run flags (op-fusion on, no VMI, no membar,
+#   bisheng VF-fusion on). The PRECISION_REPORT.md baseline sweep used these.
+# vmi-membar-vfoff: VMI fusion pipeline + vecscope memory barrier + 7 bisheng
+#   -mllvm options that turn off bisheng's VF-fusion backend passes, so the
+#   NPU sees the membar-inserted schedule without bisheng re-fusing it.
+#   See ptoas/README-vmi-membar-bishengvfoff.md for the route spec.
+_PTO_FLAGS_BASELINE = [
+    "--pto-arch=a5", "--pto-level=level3", "--pto-backend=vpto",
+    "--enable-tile-op-expand", "--enable-insert-sync", "--enable-op-fusion",
+]
+_PTO_FLAGS_VMI_MEMBAR = [
+    "--pto-arch=a5", "--pto-level=level3", "--pto-backend=vpto",
+    "--enable-tile-op-expand", "--enable-insert-sync",
+    "--enable-vmi", "--enable-op-fusion=true", "--enable-vecscope-mem-bar",
+]
+# 7 bisheng -mllvm options = backend expansion of --cce-simd-vf-fusion=false.
+# The frontend flag is rejected under the IR path ("argument unused"); the
+# backend options are the only way to turn VF fusion off.
+_BISHENG_VFOFF_MLLVM = [
+    "-mllvm", "-cce-vf-enable-vf-fusion=false",
+    "-mllvm", "-cce-vf-enable-vf-loop-extender=false",
+    "-mllvm", "-cce-vf-enable-loop-fusion=false",
+    "-mllvm", "-cce-vf-enable-vf-ldst-elimination=false",
+    "-mllvm", "-cce-vf-enable-ub-dead-st-elimination=false",
+    "-mllvm", "-cce-vf-auto-sync=off",
+    "-mllvm", "-cce-vf-enable-vf-ifelse-extender=false",
+]
+
+
+def _pto_flags_for_route(route: str) -> list[str]:
+    if route == "vmi-membar-vfoff":
+        return _PTO_FLAGS_VMI_MEMBAR
+    return _PTO_FLAGS_BASELINE
+
+
+def _bisheng_extra_mllvm(route: str) -> list[str]:
+    """Extra -mllvm options to append to the bisheng launch.o compile."""
+    if route == "vmi-membar-vfoff":
+        return list(_BISHENG_VFOFF_MLLVM)
+    return []
+
+
 def _nm_fatobj(fatobj: Path, kernel: str) -> dict:
     """Inspect the fatobj: does it have the kernel symbol + nested ELF?"""
     info = {"has_kernel_sym": False, "has_ctor": False, "nested_elf_offsets": [],
@@ -264,6 +307,14 @@ def main() -> int:
                          "Skips resolve_meta + dump_bins; uses the captured "
                          "buffers directly. For non-leaf inner kernels whose "
                          "ptrs are intermediates from a preceding kernel.")
+    ap.add_argument("--route", default="baseline",
+                    choices=["baseline", "vmi-membar-vfoff"],
+                    help="VPTO codegen route. 'baseline' = current flags "
+                         "(op-fusion on, no membar, bisheng VF-fusion on). "
+                         "'vmi-membar-vfoff' = VMI fusion + "
+                         "--enable-vecscope-mem-bar + 7 bisheng -mllvm "
+                         "VF-fusion-off options. See ptoas "
+                         "README-vmi-membar-bishengvfoff.md.")
     ap.add_argument("--keep", action="store_true", help="keep the run dir (default: build_output)")
     args = ap.parse_args()
 
@@ -475,10 +526,10 @@ if __name__ == "__main__":
     tileops_pycache = Path(tilelang) / "__pycache__"
     if tileops_pycache.exists():
         shutil.rmtree(tileops_pycache, ignore_errors=True)
-    _run([ptoas_bin] + setup_vpto.PTO_COMPILE_OPT
+    _run([ptoas_bin] + _pto_flags_for_route(args.route)
          + ["--tilelang-path", tilelang, "--tilelang-pkg-path", tilelang_pkg,
             str(pto_file), "-o", str(fatobj)],
-         env=daemon_env, label="ptoas VPTO")
+         env=daemon_env, label=f"ptoas VPTO (route={args.route})")
 
     fatobj_info = _nm_fatobj(fatobj, kernel)
     print(f"[vpto_run] fatobj: {fatobj_info['size']} bytes, "
@@ -492,6 +543,8 @@ if __name__ == "__main__":
         return 1
 
     # --- 5. bisheng: launch.o, .so, host bin ---
+    # For route=vmi-membar-vfoff, append the 7 VF-fusion-off -mllvm options
+    # so bisheng does not re-fuse the membar-inserted schedule.
     _run([bisheng, "-c", "-fPIC", "-xcce", "-fenable-matrix", "--cce-aicore-enable-tl",
           "-fPIC", "-Xhost-start", "-Xhost-end",
           "-mllvm", "-cce-aicore-stack-size=0x8000",
@@ -499,13 +552,14 @@ if __name__ == "__main__":
           "-mllvm", "-cce-aicore-record-overflow=true",
           "-mllvm", "-cce-aicore-addr-transform",
           "-mllvm", "-cce-aicore-dcci-insert-for-scalar=false",
+          *_bisheng_extra_mllvm(args.route),
           "--cce-aicore-arch=dav-c310-vec", "-DREGISTER_BASE", "-std=c++17",
           "-Wno-macro-redefined", "-Wno-ignored-attributes",
           "-I", f"{ascend}/include", "-I", f"{ascend}/pkg_inc",
           "-I", f"{ascend}/pkg_inc/profiling", "-I", f"{ascend}/pkg_inc/runtime/runtime",
           "-I", f"{pto_isa}/include", "-I", f"{pto_isa}/tests/common",
           str(run_dir / "launch.cpp"), "-o", str(build_root / "launch.o")],
-         env=cann_env, label="bisheng launch.o")
+         env=cann_env, label=f"bisheng launch.o (route={args.route})")
     _run([bisheng, "-fPIC", "-s", "-Wl,-z,relro", "-Wl,-z,now", "--cce-fatobj-link",
           "-shared", f"-Wl,-soname,lib{kernel}_kernel.so",
           "-L", f"{ascend}/lib64", "-Wl,-rpath," + f"{ascend}/lib64",

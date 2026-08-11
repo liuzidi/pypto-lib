@@ -74,7 +74,15 @@ def load_strict_leaves(csv_path: Path, mode: str) -> list[dict]:
     return rows
 
 
-def run_one_leaf(row: dict, mode: str, device: int) -> dict:
+def _route_label(route: str, phase5: bool = False) -> str:
+    """Build the CSV 'route' column value. Keeps the 'vpto' / 'vpto(phase5)'
+    base label so the baseline-vs-vmi distinction is visible alongside the
+    phase-vs-leaf distinction."""
+    suffix = f"[{route}]" if route and route != "baseline" else ""
+    return f"vpto(phase5){suffix}" if phase5 else f"vpto{suffix}"
+
+
+def run_one_leaf(row: dict, mode: str, device: int, route: str = "baseline") -> dict:
     """Invoke vpto_run.py for one leaf with vpto_env.sh sourced.
 
     Returns a result dict (schema = RESULT_FIELDS). On any subprocess error,
@@ -90,7 +98,7 @@ def run_one_leaf(row: dict, mode: str, device: int) -> dict:
         "bash", "-c",
         f"source {VPTO_ENV_SH} && exec python3 {SKILL_RUN} "
         f"--pto {pto_path} --model-py {model_py} "
-        f"--mode {mode} --device {device}",
+        f"--mode {mode} --device {device} --route {route}",
     ]
     print(f"\n[validate] {kernel}: running ...", flush=True)
     try:
@@ -125,18 +133,19 @@ def run_one_leaf(row: dict, mode: str, device: int) -> dict:
            else result.get(f) for f in RESULT_FIELDS}
     out["kernel"] = kernel
     out["module"] = row.get("module", "")
-    out["route"] = "vpto"
+    out["route"] = _route_label(route)
     out["mode"] = mode
     out["device"] = device
     return out
 
 
-def _error_row(row: dict, mode: str, device: int, error: str) -> dict:
+def _error_row(row: dict, mode: str, device: int, error: str,
+               route: str = "baseline") -> dict:
     out = {f: "" for f in RESULT_FIELDS}
     out.update({
         "kernel": row.get("kernel", ""),
         "module": row.get("module", ""),
-        "route": "vpto",
+        "route": _route_label(route),
         "mode": mode,
         "device": device,
         "pass": False,
@@ -147,7 +156,8 @@ def _error_row(row: dict, mode: str, device: int, error: str) -> dict:
     return out
 
 
-def run_phase5_module(module: str, model_py: Path, mode: str, device: int) -> list:
+def run_phase5_module(module: str, model_py: Path, mode: str, device: int,
+                      route: str = "baseline") -> list:
     """Phase 5: capture one module's intermediate GM buffers (Route 1 run with
     enable_dump_args=2), then replay each inner kernel on Route 2 (VPTO) using
     the captured buffers and compare.
@@ -255,7 +265,7 @@ def run_phase5_module(module: str, model_py: Path, mode: str, device: int) -> li
             "bash", "-c",
             f"source {VPTO_ENV_SH} && exec {venv_py} {vpto_run} "
             f"--pto {pto} --model-py {model_py} --mode {mode} "
-            f"--device {device} --kernel {kname} "
+            f"--device {device} --kernel {kname} --route {route} "
             f"--captured-dump {run_dir}"]
         try:
             r = subprocess.run(cmd, capture_output=True, text=True,
@@ -290,7 +300,7 @@ def run_phase5_module(module: str, model_py: Path, mode: str, device: int) -> li
                else res.get(f) for f in RESULT_FIELDS}
         out["kernel"] = kname
         out["module"] = module
-        out["route"] = "vpto(phase5)"
+        out["route"] = _route_label(route, phase5=True)
         out["mode"] = mode
         out["device"] = device
         results.append(out)
@@ -303,10 +313,11 @@ def run_phase5_module(module: str, model_py: Path, mode: str, device: int) -> li
 
 
 def _phase5_error_row(module: str, model_py: Path, mode: str, device: int,
-                      kernel: str, error: str) -> dict:
+                      kernel: str, error: str, route: str = "baseline") -> dict:
     out = {f: "" for f in RESULT_FIELDS}
     out.update({
-        "kernel": kernel, "module": module, "route": "vpto(phase5)",
+        "kernel": kernel, "module": module,
+        "route": _route_label(route, phase5=True),
         "mode": mode, "device": device, "pass": False,
         "compare_status": "crash", "exit_code": -1, "error": error,
     })
@@ -429,6 +440,17 @@ def main() -> int:
                          "modules (24 modules: 16 decode + 8 prefill). "
                          "Capture once per module, replay each kernel. "
                          "Prefill modules use --mode prefill automatically.")
+    ap.add_argument("--route", default="baseline",
+                    choices=["baseline", "vmi-membar-vfoff"],
+                    help="VPTO codegen route. 'baseline' = op-fusion on, "
+                         "no membar, bisheng VF-fusion on. 'vmi-membar-vfoff' "
+                         "= VMI fusion + vecscope membar + bisheng VF-fusion "
+                         "off (7 -mllvm options). See ptoas "
+                         "README-vmi-membar-bishengvfoff.md. Default: baseline.")
+    ap.add_argument("--out", default=None,
+                    help="output CSV path (default: "
+                         "baselines/vpto_dsv4_vector/sweep_results.csv for "
+                         "baseline route, sweep_results_<route>.csv for others).")
     args = ap.parse_args()
 
     if not VPTO_ENV_SH.exists():
@@ -450,16 +472,18 @@ def main() -> int:
                       f"{model_py.name} not found", flush=True)
                 all_results.append(_phase5_error_row(
                     mod, model_py, mod_mode, args.device, mod,
-                    f"model .py not found: {model_py}"))
+                    f"model .py not found: {model_py}", route=args.route))
                 continue
             print(f"\n[validate] [{mi}/{n_modules}] === module {mod} "
-                  f"({model_py.name}, mode={mod_mode}) ===", flush=True)
+                  f"({model_py.name}, mode={mod_mode}, route={args.route}) ===",
+                  flush=True)
             try:
-                mod_results = run_phase5_module(mod, model_py, mod_mode, args.device)
+                mod_results = run_phase5_module(mod, model_py, mod_mode, args.device,
+                                                route=args.route)
             except Exception as e:  # noqa: BLE001 — never abort the full sweep
                 mod_results = [_phase5_error_row(
                     mod, model_py, mod_mode, args.device, mod,
-                    f"module sweep crashed: {e}")]
+                    f"module sweep crashed: {e}", route=args.route)]
             all_results.extend(mod_results)
         results = all_results
     elif args.module is not None:
@@ -480,7 +504,8 @@ def main() -> int:
         mod_mode = "prefill" if mod.startswith("prefill_") else args.mode
         print(f"[validate] [phase5] module={mod} model={model_py.name} "
               f"device={args.device} mode={mod_mode}")
-        results = run_phase5_module(mod, model_py, mod_mode, args.device)
+        results = run_phase5_module(mod, model_py, mod_mode, args.device,
+                                    route=args.route)
     else:
         # --- leaf sweep (Route 2 Mode B, no capture needed) ---
         if not CLASSIFICATION_CSV.exists():
@@ -496,7 +521,7 @@ def main() -> int:
         for i, row in enumerate(leaves, 1):
             print(f"\n[validate] === [{i}/{len(leaves)}] {row['kernel']} "
                   f"(module={row.get('module','')}) ===", flush=True)
-            res = run_one_leaf(row, args.mode, args.device)
+            res = run_one_leaf(row, args.mode, args.device, route=args.route)
             results.append(res)
             status = "PASS" if res.get("pass") else "FAIL"
             md = res.get("max_diff", "")
@@ -510,9 +535,13 @@ def main() -> int:
                 parts.append(f"err={res['error'][:80]}")
             print(" ".join(parts), flush=True)
 
-    # write aggregated CSV
-    SWEEP_RESULTS_CSV.parent.mkdir(parents=True, exist_ok=True)
-    with open(SWEEP_RESULTS_CSV, "w", newline="", encoding="utf-8") as f:
+    # write aggregated CSV (route-specific filename so baseline sweep is not
+    # overwritten by a vmi-membar-vfoff sweep)
+    out_csv = Path(args.out) if args.out else (
+        SWEEP_RESULTS_CSV if args.route == "baseline"
+        else SWEEP_RESULTS_CSV.parent / f"sweep_results_{args.route}.csv")
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_csv, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=RESULT_FIELDS)
         w.writeheader()
         w.writerows(results)
@@ -521,8 +550,9 @@ def main() -> int:
     n_pass = sum(1 for r in results if r.get("pass"))
     n_total = len(results)
     print(f"\n[validate] ===== sweep summary =====")
-    print(f"[validate] route: VPTO (Route 2)")
-    print(f"[validate] {n_pass}/{n_total} leaves PASS; "
+    print(f"[validate] route: {args.route}")
+    print(f"[validate] results CSV: {out_csv}")
+    print(f"[validate] {n_pass}/{n_total} kernels PASS; "
           f"{n_total - n_pass} FAIL")
     for r in results:
         status = "PASS" if r.get("pass") else "FAIL"
