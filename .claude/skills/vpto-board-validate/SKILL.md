@@ -73,9 +73,17 @@ omitting the two steps above. Verified on `rmsnorm` (vector) and
   `test_for_ptoas` harness. Compare is exact-match (f32) / ULP≤1 (bf16).
 - `--model-py` (Mode B): a DSV4 model `.py` using the `run_jit`-style
   golden convention — it exposes `<base>_test` (the `@pl.jit` fn),
-  `build_tensor_specs(B, S)` → `[TensorSpec...]`, and
-  `golden_<base>_test(tensors)` (fills outputs in-place). `--mode decode`
-  or `prefill` selects the `MODES` entry. Compare is tolerance-based
+  `build_tensor_specs(...)` → `[TensorSpec...]`, and
+  `golden_<base>(tensors)` (fills outputs in-place). The
+  `build_tensor_specs` signature varies across DSV4 models (8 variants:
+  `(B,S)`, `()`, `(start_pos=None)`, `(layer_id=0, num_tokens=T)`,
+  `(compress_ratio=4)`, etc.); the skill inspects the signature and fills
+  kwargs from config-derived `B`/`S` + mode-agnostic defaults. The golden
+  fn name is also not uniform: the resolver tries `golden_<base>_test`,
+  `golden_<base>`, then a unique `golden_*` callable fallback (the `_test`
+  suffix is optional). `--mode decode` or `prefill` selects B/S from
+  `config.py` constants (`DECODE_BATCH`/`DECODE_SEQ`,
+  `PREFILL_BATCH`/`PREFILL_SEQ`). Compare is tolerance-based
   (default `rtol=5e-3 atol=5e-3`, overridable via `--rtol`/`--atol`),
   matching the DSV4 models' own `run_jit` tolerances.
 
@@ -87,14 +95,19 @@ omitting the two steps above. Verified on `rmsnorm` (vector) and
 | python for golden | system `python3` | repo `.venv` (has torch + golden pkg) |
 | compare | exact / ULP | `rtol`/`atol` tolerance |
 | elem_counts | from `.pto` static dims | from `TensorSpec.shape` product (handles dynamic `[%arg3, D]`) |
-| `ctx_len` scalar | `MAX_SEQ` from golden_lib | `B*S` from `MODES` via config.py |
+| ptr↔spec mapping | positional (ptr order == spec order) | view-name prefix match (ptr order may differ from spec order) |
+| `ctx_len` scalar | `MAX_SEQ` from golden_lib | `B*S` from `config.py` constants |
 
 Mode B requires a **leaf module**: the `.pto` kernel's ptr-arg count must
-equal the model's `TensorSpec` count (ptr-args == module specs, 1:1, in
-order). For multi-kernel modules (ptr-args are intermediates from a
-preceding kernel, not module inputs), the model `golden_fn` cannot
-produce the kernel's inputs — those need intermediate capture (not yet
-supported; the skill emits a clear "not a leaf module" error).
+equal the model's `TensorSpec` count, AND each ptr must map to a spec via
+view-name prefix matching (the ptr's tensor-view stem, e.g. `x`,
+`x_normed`, `y_flat`, encodes the jit-fn param name == the TensorSpec
+name), AND ptr dtype must match the mapped spec's dtype. For multi-kernel
+modules (ptrs are intermediates from a preceding kernel, not module
+inputs — e.g. `hc_head_pre_fused` has 3 of 5 ptrs as intermediates), the
+model `golden_fn` cannot produce the kernel's inputs — those need
+intermediate capture (not yet supported; the skill emits a clear "not a
+leaf module" / "could not map ptr" error).
 
 ## Workflow
 

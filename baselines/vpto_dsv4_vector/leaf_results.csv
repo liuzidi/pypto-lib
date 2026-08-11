@@ -1,0 +1,3 @@
+kernel,module,fatobj_bytes,has_kernel_sym,has_ctor,nested_elf,timing_ms,compare_pass,max_diff,n_over,rtol,atol,error
+rms_norm,rms_norm,8712,True,True,"[0, 288]",7.694,FAIL,30464.2,56189/57344,0.005,0.005,"compare failed: v2 max_diff=30464.2; NPU x_normed[0]=30464.0 (garbage), rest ~4e-4 (near-zero). Input x and golden x_normed are sane (±4). Likely VPTO lowering/runtime issue, not pipeline bug (mapping/scalars/bins all verified correct)."
+hc_post,hc_post,6968,True,True,"[0, 288]",0.562,FAIL,0.30648,26331/229376,0.005,0.005,"compare failed: v1 max_diff=0.30648 (11.5% over threshold). FP32 residual stream values are in the right magnitude; per-kernel VPTO lowering precision issue, not pipeline bug."
