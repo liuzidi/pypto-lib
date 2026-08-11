@@ -94,7 +94,11 @@ def run_one_leaf(row: dict, mode: str, device: int) -> dict:
     ]
     print(f"\n[validate] {kernel}: running ...", flush=True)
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(REPO_ROOT))
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           cwd=str(REPO_ROOT), timeout=300)
+    except subprocess.TimeoutExpired:
+        return _error_row(row, mode, device,
+                          f"replay timed out (>300s) — likely ptoas/bisheng/NPU hang")
     except Exception as e:  # noqa: BLE001 — sweep must not abort
         return _error_row(row, mode, device, f"subprocess launch failed: {e}")
     # print the skill's tail so the user sees ptoas/bisheng/NPU/compare lines
@@ -167,27 +171,39 @@ def run_phase5_module(module: str, model_py: Path, mode: str, device: int) -> li
     if not (dump_wd / "dfx_outputs" / "args_dump" / "args_dump.json").exists():
         print(f"[validate] [phase5] running module {module} with dump...",
               flush=True)
-        mod = _capture._load_module(model_py)
-        # set the PTOAS_ROOT env so pypto can find ptoas for compilation
-        env = dict(os.environ)
-        env["PTOAS_ROOT"] = "/data/liuzidi/PTOAS/build311/tools/ptoas"
-        old_environ = os.environ
-        os.environ.clear(); os.environ.update(env)
-        try:
-            entry = _DSV4_MODULE_TO_JIT_ENTRY.get(module)
-            dump_wd = _capture._run_module_with_dump(
-                mod, model_py, mode, device, dump_wd, jit_entry=entry)
-        except Exception as e:  # noqa: BLE001
-            os.environ.clear(); os.environ.update(old_environ)
-            return [_phase5_error_row(module, model_py, mode, device,
-                                      f"capture (run_jit) failed: {e}")]
-        os.environ.clear(); os.environ.update(old_environ)
+        # Run the module dump in a subprocess with vpto_env.sh sourced + the
+        # CANN env inherited. Doing this in-process fails because pypto's
+        # worker.init dlopens libruntime_common.so, which depends on the full
+        # CANN LD_LIBRARY_PATH (set by the nested set_env.sh source); the env
+        # dict captured by _source_vpto_env is incomplete for that dlopen
+        # chain. A bash -c subprocess inherits the bash shell's complete
+        # post-source env correctly.
+        entry = _DSV4_MODULE_TO_JIT_ENTRY.get(module)
+        cap_cmd = [
+            "bash", "-c",
+            f"source {VPTO_ENV_SH} && export PTOAS_ROOT={str(Path(_resolve_ptoas_bin()).parent)} "
+            f"&& exec {venv_py} {capture_py} --capture-only "
+            f"--model-py {model_py} --mode {mode} --device {device} "
+            f"--jit-entry {entry}"
+        ]
+        print(f"[validate] [phase5] capturing {module} (one-time Route-1 dump)...",
+              flush=True)
+        cap_r = subprocess.run(cap_cmd, capture_output=True, text=True,
+                                cwd=str(REPO_ROOT), timeout=300)
+        if cap_r.stdout:
+            print(cap_r.stdout.rstrip()[-1000:])
+        if cap_r.returncode != 0:
+            print(cap_r.stderr.rstrip()[-600:], file=sys.stderr)
+            return [_phase5_error_row(
+                module, model_py, mode, device, module,
+                f"capture failed (exit {cap_r.returncode}): "
+                f"{(cap_r.stderr or cap_r.stdout).strip()[-200:]}")]
     print(f"[validate] [phase5] dump at {dump_wd}", flush=True)
 
     # Step 2: read name_map to get the kernel list (callable_id -> name).
     nm_glob = list((dump_wd / "dfx_outputs").glob("name_map_*.json"))
     if not nm_glob:
-        return [_phase5_error_row(module, model_py, mode, device,
+        return [_phase5_error_row(module, model_py, mode, device, module,
                                   "no name_map_*.json in dump")]
     name_map = json.loads(nm_glob[0].read_text(encoding="utf-8"))
     cid2name = name_map["callable_id_to_name"]
@@ -243,7 +259,12 @@ def run_phase5_module(module: str, model_py: Path, mode: str, device: int) -> li
             f"--captured-dump {run_dir}"]
         try:
             r = subprocess.run(cmd, capture_output=True, text=True,
-                               cwd=str(REPO_ROOT))
+                               cwd=str(REPO_ROOT), timeout=300)
+        except subprocess.TimeoutExpired:
+            results.append(_phase5_error_row(
+                module, model_py, mode, device, kname,
+                "replay timed out (>300s) — likely ptoas/bisheng/NPU hang"))
+            continue
         except Exception as e:  # noqa: BLE001
             results.append(_phase5_error_row(
                 module, model_py, mode, device, kname,
@@ -292,8 +313,55 @@ def _phase5_error_row(module: str, model_py: Path, mode: str, device: int,
     return out
 
 
+def _resolve_ptoas_bin() -> str:
+    """Parse PTOAS_BIN out of scripts/vpto_env.sh (rather than hardcoding a
+    private absolute path). Returns '' if not found."""
+    import re
+    try:
+        text = VPTO_ENV_SH.read_text(encoding="utf-8")
+        m = re.search(r'^export\s+PTOAS_BIN=(\S+)', text, re.M)
+        if m:
+            return m.group(1).strip('"').strip("'")
+    except OSError:
+        pass
+    return ""
+
+
+def _source_vpto_env() -> dict:
+    """Return the environment dict that `source scripts/vpto_env.sh` produces.
+    Capture runs run_jit in-process, so the CANN/PTOAS env vars must be set on
+    os.environ first. We source the script in bash then print env from python
+    (NOT `env` command — which misses some vars that vpto_env.sh's nested
+    set_env.sh source sets without exporting to the `env` command's view).
+    """
+    import subprocess
+    venv_py = str(REPO_ROOT / ".venv" / "bin" / "python3")
+    cmd = (
+        f"source {VPTO_ENV_SH} && {venv_py} -c "
+        "'import os; [print(k+chr(0)+v) for k,v in os.environ.items()]'"
+    )
+    r = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True,
+                       timeout=120)
+    if r.returncode != 0:
+        return dict(os.environ)
+    env = {}
+    # use chr(0) as separator to handle multi-line values; split on first \0
+    for line in r.stdout.split("\n"):
+        if "\x00" in line:
+            k, v = line.split("\x00", 1)
+            env[k] = v
+        elif "=" in line and not line.startswith("[vpto_env]"):
+            # fallback for lines without separator
+            k, v = line.split("=", 1)
+            env[k] = v
+    merged = dict(os.environ)
+    merged.update(env)
+    return merged
+
+
 # DSV4 module -> model .py mapping (the _jit_<mod>_test_* dir name).
 _DSV4_MODULE_TO_PY = {
+    # decode (16)
     "attention_csa": "decode_attention_csa.py",
     "attention_hca": "decode_attention_hca.py",
     "attention_swa": "decode_attention_swa.py",
@@ -305,6 +373,15 @@ _DSV4_MODULE_TO_PY = {
     "hc_pre": "hc_pre.py", "mtp_projection": "mtp_projection.py",
     "qkv_proj_rope": "qkv_proj_rope.py", "rms_norm": "rmsnorm.py",
     "expert_routed": "expert_routed.py", "expert_shared": "expert_shared.py",
+    # prefill (8) — each emits inner kernels like its decode counterpart
+    "prefill_attention_csa": "prefill_attention_csa.py",
+    "prefill_attention_hca": "prefill_attention_hca.py",
+    "prefill_attention_swa": "prefill_attention_swa.py",
+    "prefill_compressor_ratio128": "prefill_compressor_ratio128.py",
+    "prefill_compressor_ratio4": "prefill_compressor_ratio4.py",
+    "prefill_indexer": "prefill_indexer.py",
+    "prefill_indexer_compressor": "prefill_indexer_compressor.py",
+    "prefill_sparse_attn": "prefill_sparse_attn.py",
 }
 
 # DSV4 module -> the @pl.jit entry fn name (when it differs from <stem>_test).
@@ -320,6 +397,14 @@ _DSV4_MODULE_TO_JIT_ENTRY = {
     "hc_pre": "hc_pre_test", "mtp_projection": "mtp_projection_test",
     "qkv_proj_rope": "qkv_proj_rope_test", "rms_norm": "rms_norm_test",
     "expert_routed": "expert_routed_test", "expert_shared": "expert_shared_test",
+    "prefill_attention_csa": "prefill_attention_csa_test",
+    "prefill_attention_hca": "prefill_attention_hca_test",
+    "prefill_attention_swa": "prefill_attention_swa_test",
+    "prefill_compressor_ratio128": "prefill_compressor_ratio128_test",
+    "prefill_compressor_ratio4": "prefill_compressor_ratio4_test",
+    "prefill_indexer": "prefill_indexer_test",
+    "prefill_indexer_compressor": "prefill_indexer_compressor_test",
+    "prefill_sparse_attn": "prefill_sparse_attn_test",
 }
 
 
@@ -339,6 +424,11 @@ def main() -> int:
                          "(capture once via Route 1, replay each on Route 2). "
                          "e.g. --module attention_csa. When set, the leaf "
                          "sweep is skipped.")
+    ap.add_argument("--all-modules", action="store_true",
+                    help="Phase 5: sweep ALL inner kernels of ALL DSV4 "
+                         "modules (24 modules: 16 decode + 8 prefill). "
+                         "Capture once per module, replay each kernel. "
+                         "Prefill modules use --mode prefill automatically.")
     args = ap.parse_args()
 
     if not VPTO_ENV_SH.exists():
@@ -346,7 +436,33 @@ def main() -> int:
         return 2
 
     # --- Phase 5: module inner-kernel sweep (capture + replay) ---
-    if args.module is not None:
+    if args.all_modules:
+        # sweep every module in _DSV4_MODULE_TO_PY. Prefill modules (key
+        # starts with prefill_) use mode=prefill; decode modules use args.mode
+        # (default decode). Results aggregate into one sweep_results.csv.
+        all_results = []
+        n_modules = len(_DSV4_MODULE_TO_PY)
+        for mi, mod in enumerate(_DSV4_MODULE_TO_PY, 1):
+            mod_mode = "prefill" if mod.startswith("prefill_") else args.mode
+            model_py = REPO_ROOT / "models" / "deepseek_v4_pro" / _DSV4_MODULE_TO_PY[mod]
+            if not model_py.exists():
+                print(f"\n[validate] [{mi}/{n_modules}] SKIP {mod}: "
+                      f"{model_py.name} not found", flush=True)
+                all_results.append(_phase5_error_row(
+                    mod, model_py, mod_mode, args.device, mod,
+                    f"model .py not found: {model_py}"))
+                continue
+            print(f"\n[validate] [{mi}/{n_modules}] === module {mod} "
+                  f"({model_py.name}, mode={mod_mode}) ===", flush=True)
+            try:
+                mod_results = run_phase5_module(mod, model_py, mod_mode, args.device)
+            except Exception as e:  # noqa: BLE001 — never abort the full sweep
+                mod_results = [_phase5_error_row(
+                    mod, model_py, mod_mode, args.device, mod,
+                    f"module sweep crashed: {e}")]
+            all_results.extend(mod_results)
+        results = all_results
+    elif args.module is not None:
         mod = args.module
         mod_py_name = _DSV4_MODULE_TO_PY.get(mod, f"{mod}.py")
         model_py = REPO_ROOT / "models" / "deepseek_v4_pro" / mod_py_name
@@ -361,9 +477,10 @@ def main() -> int:
             print(f"[validate] ERROR: no model .py for module {mod!r} "
                   f"(tried {mod_py_name})", file=sys.stderr)
             return 2
+        mod_mode = "prefill" if mod.startswith("prefill_") else args.mode
         print(f"[validate] [phase5] module={mod} model={model_py.name} "
-              f"device={args.device} mode={args.mode}")
-        results = run_phase5_module(mod, model_py, args.mode, args.device)
+              f"device={args.device} mode={mod_mode}")
+        results = run_phase5_module(mod, model_py, mod_mode, args.device)
     else:
         # --- leaf sweep (Route 2 Mode B, no capture needed) ---
         if not CLASSIFICATION_CSV.exists():

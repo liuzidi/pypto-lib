@@ -93,12 +93,15 @@ def _jit_entry(mod, stem: str, override: str | None = None):
 
 
 def _bs_from_config(config_py: Path, mode: str):
+    model_dir = str(config_py.parent.absolute())
+    b_attr = "DECODE_BATCH" if mode == "decode" else "PREFILL_BATCH"
+    s_attr = "DECODE_SEQ" if mode == "decode" else "PREFILL_SEQ"
     code = (
-        "import importlib.util\n"
+        "import importlib.util, sys\n"
+        f"sys.path.insert(0, {model_dir!r})\n"
         f"spec = importlib.util.spec_from_file_location('cfg', {str(config_py.absolute())!r})\n"
         "cfg = importlib.util.module_from_spec(spec); spec.loader.exec_module(cfg)\n"
-        f"print(getattr(cfg, {'DECODE_BATCH' if mode=='decode' else 'PREFILL_BATCH'}), "
-        f"getattr(cfg, {'DECODE_SEQ' if mode=='decode' else 'PREFILL_SEQ'}))\n"
+        f"print(getattr(cfg, {b_attr!r}), getattr(cfg, {s_attr!r}))\n"
     )
     r = subprocess.run([str(REPO_ROOT / ".venv" / "bin" / "python3"), "-c", code],
                       capture_output=True, text=True, timeout=30)
@@ -206,17 +209,47 @@ _CAPTURE_META_NAME = "capture_meta.json"
 def main() -> int:
     ap = argparse.ArgumentParser(description="Phase 5 intermediate-GM capture.")
     ap.add_argument("--model-py", required=True, type=Path)
-    ap.add_argument("--kernel", required=True,
-                    help="target inner kernel name (must be in name_map)")
+    ap.add_argument("--kernel", default=None,
+                    help="target inner kernel name (must be in name_map). "
+                         "Required unless --capture-only or --dump-dir is set.")
     ap.add_argument("--mode", default="decode", choices=["decode", "prefill"])
     ap.add_argument("--device", type=int, default=0)
-    ap.add_argument("--run-dir", required=True, type=Path,
+    ap.add_argument("--run-dir", type=Path, default=None,
                     help="where to write vN.bin / golden_vN.bin for replay")
-    ap.add_argument("--pto", required=True, type=Path,
+    ap.add_argument("--pto", type=Path, default=None,
                     help="the kernel's .pto (for replay meta)")
     ap.add_argument("--dump-dir", type=Path, default=None,
                     help="reuse an existing dump work_dir instead of re-running")
+    ap.add_argument("--capture-only", action="store_true",
+                    help="only run the module dump (no harvest); writes the "
+                         "dump work_dir. Used by validate.py to run the dump "
+                         "in a subprocess so CANN env is inherited correctly.")
+    ap.add_argument("--jit-entry", default=None,
+                    help="override the @pl.jit entry fn name "
+                         "(e.g. attention_csa_test)")
     args = ap.parse_args()
+
+    if args.capture_only:
+        mod = _load_module(args.model_py)
+        # default dump work_dir: phase5_dump_<model stem>
+        dump_wd = (REPO_ROOT / "build_output" /
+                   f"phase5_dump_{args.model_py.stem}")
+        real_wd = _run_module_with_dump(
+            mod, args.model_py, args.mode, args.device, dump_wd,
+            jit_entry=args.jit_entry)
+        # run_jit picks its own work_dir (compiled.output_dir), which differs
+        # from our requested dump_wd. Symlink so the caller (validate.py) can
+        # find the dump at the predictable phase5_dump_<stem> path.
+        if real_wd.resolve() != dump_wd.resolve():
+            if dump_wd.is_symlink() or dump_wd.exists():
+                if dump_wd.is_dir() and not dump_wd.is_symlink():
+                    shutil.rmtree(dump_wd, ignore_errors=True)
+                else:
+                    dump_wd.unlink(missing_ok=True)
+            dump_wd.parent.mkdir(parents=True, exist_ok=True)
+            dump_wd.symlink_to(real_wd.resolve())
+        print(f"[capture] capture-only: dump at {dump_wd} -> {real_wd}")
+        return 0
 
     if args.dump_dir is not None:
         dump_wd = args.dump_dir
@@ -224,9 +257,14 @@ def main() -> int:
         mod = _load_module(args.model_py)
         dump_wd = _run_module_with_dump(mod, args.model_py, args.mode, args.device,
                                         REPO_ROOT / "build_output" /
-                                        f"phase5_dump_{args.model_py.stem}")
+                                        f"phase5_dump_{args.model_py.stem}",
+                                        jit_entry=args.jit_entry)
         print(f"[capture] module dump at {dump_wd}")
 
+    if not args.kernel or not args.run_dir or not args.pto:
+        print("[capture] ERROR: --kernel, --run-dir, --pto required "
+              "for harvest (or use --capture-only)", file=sys.stderr)
+        return 2
     meta = harvest_kernel(dump_wd, dump_wd, args.kernel, args.run_dir, args.pto)
     # write capture_meta.json so vpto_run.py --captured-dump can read
     # outputs/np_types/elem_counts without calling resolve_meta (which would
