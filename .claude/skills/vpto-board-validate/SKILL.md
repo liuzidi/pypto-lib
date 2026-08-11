@@ -67,20 +67,52 @@ omitting the two steps above. Verified on `rmsnorm` (vector) and
 
 - `--pto`: a pypto-emitted `.pto` (EmitC-era tile dialect:
   `tile_buf`/`tload`/`tstore`/`make_tensor_view`/`partition_view`/...).
-- `--golden-lib`: a `*_golden_lib.py` exposing `BUILDERS = {"<kernel>": build_fn}`
-  and `run_case(name)`. The build fn returns `buffers, {"vN": golden_output}`.
-  This is the same contract as the `test_for_ptoas` harness.
+- `--golden-lib` (Mode A): a `*_golden_lib.py` exposing
+  `BUILDERS = {"<kernel>": build_fn}` and `run_case(name)`. The build fn
+  returns `buffers, {"vN": golden_output}`. Same contract as the
+  `test_for_ptoas` harness. Compare is exact-match (f32) / ULP≤1 (bf16).
+- `--model-py` (Mode B): a DSV4 model `.py` using the `run_jit`-style
+  golden convention — it exposes `<base>_test` (the `@pl.jit` fn),
+  `build_tensor_specs(B, S)` → `[TensorSpec...]`, and
+  `golden_<base>_test(tensors)` (fills outputs in-place). `--mode decode`
+  or `prefill` selects the `MODES` entry. Compare is tolerance-based
+  (default `rtol=5e-3 atol=5e-3`, overridable via `--rtol`/`--atol`),
+  matching the DSV4 models' own `run_jit` tolerances.
+
+### Mode A vs Mode B
+
+| | Mode A (`--golden-lib`) | Mode B (`--model-py`) |
+|---|---|---|
+| golden contract | `BUILDERS` + `run_case` | `run_jit` (`build_tensor_specs` + `golden_fn`) |
+| python for golden | system `python3` | repo `.venv` (has torch + golden pkg) |
+| compare | exact / ULP | `rtol`/`atol` tolerance |
+| elem_counts | from `.pto` static dims | from `TensorSpec.shape` product (handles dynamic `[%arg3, D]`) |
+| `ctx_len` scalar | `MAX_SEQ` from golden_lib | `B*S` from `MODES` via config.py |
+
+Mode B requires a **leaf module**: the `.pto` kernel's ptr-arg count must
+equal the model's `TensorSpec` count (ptr-args == module specs, 1:1, in
+order). For multi-kernel modules (ptr-args are intermediates from a
+preceding kernel, not module inputs), the model `golden_fn` cannot
+produce the kernel's inputs — those need intermediate capture (not yet
+supported; the skill emits a clear "not a leaf module" error).
 
 ## Workflow
 
 ```bash
+# Mode A (test_for_ptoas reference set):
 source scripts/vpto_env.sh
 python .claude/skills/vpto-board-validate/vpto_run.py \
     --pto <path.pto> --golden-lib <golden_lib.py> --device <id>
+
+# Mode B (DSV4 leaf module):
+python .claude/skills/vpto-board-validate/vpto_run.py \
+    --pto build_output/_jit_<name>_test_*/ptoas/<kernel>.pto \
+    --model-py models/deepseek_v4_pro/<mod>.py --mode decode --device 0
 ```
 
-The executor runs: parse → sed-preprocess → ptoas VPTO → bisheng compile+link →
-golden → NPU run → compare. Output lands in `build_output/vpto_<kernel>/`.
+The executor runs: parse → (Mode B: resolve model meta) → sed-preprocess →
+ptoas VPTO → bisheng compile+link → golden bin-dump → NPU run → compare.
+Output lands in `build_output/vpto_<kernel>/`.
 
 ## Known env quirks (encoded in vpto_run.py, documented here)
 

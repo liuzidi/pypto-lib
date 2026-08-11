@@ -105,19 +105,27 @@ cleanup:
 
 
 def gen_main_cpp(info: dict, outputs: list, load_vals: dict | None = None,
-                 consts: dict | None = None, scalar_sem_names: list | None = None) -> str:
+                 consts: dict | None = None, scalar_sem_names: list | None = None,
+                 elem_counts_override: dict | None = None) -> str:
     """Render the onboard main.cpp from the .pto's parsed info.
 
     `info` is parse_pto()'s output. `outputs` is the list of output buffer
     names (from the golden_lib's BUILDERS return). `load_vals`/`consts`/
     `scalar_sem_names` fill ctx_len/ctx_blocks when the golden_lib exposes
     them; other scalars get `// FIXME` comments.
+
+    `elem_counts_override` (Mode B): {vN: int} from the model's TensorSpec
+    shape product — used when the .pto has dynamic shapes (e.g. [%arg3, D])
+    that parse_pto can't reduce to a static count. Falls back to
+    info["elem_counts"] when not given.
     """
     func = info["func_name"]
     launch = func[0].upper() + func[1:]
     ptrs = [p for p in info["params"] if p["pto_type"] not in ("i32", "index")]
     scals = [p for p in info["params"] if p["pto_type"] in ("i32", "index")]
-    ec = info.get("elem_counts", {})
+    ec = dict(info.get("elem_counts", {}))
+    if elem_counts_override:
+        ec.update(elem_counts_override)
     output_set = set(outputs)
     load_vals = load_vals or {}
     consts = consts or {}

@@ -7,14 +7,24 @@ torch/numpy golden reference. This is the executor for the
 `vpto-board-validate` skill.
 
 Usage:
+    # Mode A — test_for_ptoas golden_lib contract (BUILDERS + run_case):
     python .claude/skills/vpto-board-validate/vpto_run.py \\
         --pto <path.pto> --golden-lib <golden_lib.py> \\
         --device 0 [--kernel <name>] [--build-dir <dir>] [--keep]
 
+    # Mode B — DSV4 run_jit-style golden (model .py + MODES + golden_fn):
+    python .claude/skills/vpto-board-validate/vpto_run.py \\
+        --pto <path.pto> --model-py models/deepseek_v4_pro/<mod>.py \\
+        --mode decode --device 0
+
 Inputs:
   --pto          a pypto-emitted .pto (EmitC-era tile dialect: tile_buf/tload/...).
-  --golden-lib   a *_golden_lib.py exposing BUILDERS = {"<kernel>": build_fn, ...}
+  --golden-lib   (Mode A) a *_golden_lib.py exposing BUILDERS = {"<kernel>": ...}
                  and run_case(name). Mirrors the test_for_ptoas contract.
+  --model-py     (Mode B) a DSV4 model .py exposing <name>_test (the @pl.jit fn),
+  --mode         (Mode B) "decode" | "prefill" — selects MODES entry (B,S).
+                 build_tensor_specs(B,S) -> [TensorSpec...], golden_<name>_test.
+                 Only leaf modules supported (ptr-arg count == spec count).
 
 The skill sources `scripts/vpto_env.sh` (if not already sourced) so the ptodsl
 daemon's mlir_core_vmi is built and on PYTHONPATH — otherwise ptoas emits an
@@ -24,11 +34,17 @@ Prereqs (the skill checks and reports if missing):
   PTOAS_BIN, ASCEND_HOME_PATH, BISHENG_BIN, PTO_ISA_PATH, TILELANG_PATH,
   TILELANG_PKG  — set by scripts/vpto_env.sh + this host's CANN install.
 
-Example:
+Examples:
+    # Mode A (test_for_ptoas reference set):
     python .claude/skills/vpto-board-validate/vpto_run.py \\
         --pto test_for_ptoas_extracted/test_for_ptoas/rmsnorm.pto \\
         --golden-lib test_for_ptoas_extracted/test_for_ptoas/qwen3_decode_golden_lib.py \\
         --device 0
+
+    # Mode B (DSV4 leaf module):
+    python .claude/skills/vpto-board-validate/vpto_run.py \\
+        --pto build_output/_jit_rms_norm_test_*/ptoas/rms_norm.pto \\
+        --model-py models/deepseek_v4_pro/rmsnorm.py --mode decode --device 0
 """
 from __future__ import annotations
 
@@ -44,6 +60,7 @@ _SKILL_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(_SKILL_DIR))
 from lib.pto_parse import parse_pto, get_outputs_from_golden_lib, get_golden_constants, get_scalar_semantic_names  # noqa: E402
 from lib import setup_vpto, setup_main  # noqa: E402
+from lib import run_jit_golden  # noqa: E402
 
 # --- env: no host paths hardcoded here. Source scripts/vpto_env.sh (which
 # also sources CANN + builds /tmp/mlir_core_vmi) to set all of these. The
@@ -129,7 +146,17 @@ def _nm_fatobj(fatobj: Path, kernel: str) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description="VPTO board-validation executor")
     ap.add_argument("--pto", required=True, type=Path)
-    ap.add_argument("--golden-lib", required=True, type=Path)
+    gsrc = ap.add_mutually_exclusive_group(required=True)
+    gsrc.add_argument("--golden-lib", type=Path,
+                      help="Mode A: a *_golden_lib.py (BUILDERS + run_case).")
+    gsrc.add_argument("--model-py", type=Path,
+                      help="Mode B: a DSV4 model .py (run_jit-style golden).")
+    ap.add_argument("--mode", default="decode", choices=["decode", "prefill"],
+                    help="Mode B: which MODES entry to use (default: decode).")
+    ap.add_argument("--rtol", type=float, default=None,
+                    help="override golden compare rtol (default: model's 5e-3).")
+    ap.add_argument("--atol", type=float, default=None,
+                    help="override golden compare atol (default: model's 5e-3).")
     ap.add_argument("--kernel", default=None, help="kernel name (default: .pto stem)")
     ap.add_argument("--device", type=int, default=0)
     ap.add_argument("--build-dir", type=Path, default=None)
@@ -139,8 +166,11 @@ def main() -> int:
     if not args.pto.exists():
         print(f"[vpto_run] ERROR: .pto not found: {args.pto}", file=sys.stderr)
         return 2
-    if not args.golden_lib.exists():
+    if args.golden_lib and not args.golden_lib.exists():
         print(f"[vpto_run] ERROR: golden_lib not found: {args.golden_lib}", file=sys.stderr)
+        return 2
+    if args.model_py and not args.model_py.exists():
+        print(f"[vpto_run] ERROR: model_py not found: {args.model_py}", file=sys.stderr)
         return 2
 
     kernel = args.kernel or args.pto.stem
@@ -190,24 +220,76 @@ def main() -> int:
                          "TOOLCHAIN_HOME", "ASCEND_SLOG_PRINT_TO_STDOUT"):
                     cann_env.setdefault(k, v)
 
-    # --- parse .pto + golden_lib metadata ---
+    # --- parse .pto + golden metadata (mode-specific) ---
     info = parse_pto(args.pto)
     if not info["func_name"]:
         print(f"[vpto_run] ERROR: cannot parse .pto: {args.pto}", file=sys.stderr)
         return 2
-    outputs = get_outputs_from_golden_lib(args.golden_lib.parent, kernel) or []
-    consts = get_golden_constants(args.golden_lib.parent) or {}
-    scalar_sem = get_scalar_semantic_names(args.golden_lib.parent, kernel) or []
     pto_text = args.pto.read_text(encoding="utf-8")
     kind = setup_vpto.detect_kernel_kind(pto_text)
+
+    use_model_py = args.model_py is not None
+    if use_model_py:
+        # Mode B: DSV4 run_jit-style. The golden metadata (which specs are
+        # outputs, ctx_len = B*S, np_types, elem_counts) comes from importing
+        # the model. Resolve BEFORE main.cpp (needs outputs + elem_counts).
+        model_meta = run_jit_golden.resolve_meta(args.model_py, args.mode, info)
+        outputs = model_meta["outputs"]
+        consts = {}
+        # DSV4 .pto kernels take a trailing `index` arg = the dynamic T dim
+        # (T_DYN = B*S). setup_main fills it from load_vals["ctx_len"] when
+        # the scalar's semantic is "ctx_len" — so build scalar_sem marking the
+        # first non-spmd index/i32 scalar as ctx_len. (spmd args keep the
+        # setup_main SPMD special-case: block_num=1, block_idx=0.)
+        scalar_sem = []
+        ctx_marked = False
+        for p in info["params"]:
+            if p["pto_type"] in ("i32", "index"):
+                sig = p.get("sig_name", "") or p["name"]
+                if not ctx_marked and "spmd" not in sig:
+                    scalar_sem.append("ctx_len")
+                    ctx_marked = True
+                else:
+                    scalar_sem.append(None)
+        load_vals = {"ctx_len": model_meta["ctx_len"],
+                     "ctx_blocks": model_meta.get("ctx_blocks")}
+        golden_np_types = model_meta["np_types"]
+    else:
+        outputs = get_outputs_from_golden_lib(args.golden_lib.parent, kernel) or []
+        consts = get_golden_constants(args.golden_lib.parent) or {}
+        scalar_sem = get_scalar_semantic_names(args.golden_lib.parent, kernel) or []
+        load_vals = {"ctx_len": consts.get("MAX_SEQ"),
+                     "ctx_blocks": consts.get("MAX_CTX_BLOCKS")}
+        golden_np_types = None
     print(f"[vpto_run] kernel={kernel} kind={kind} params="
           f"{[(p['name'], p['pto_type']) for p in info['params']]} "
-          f"outputs={outputs} elem_counts={info.get('elem_counts', {})}")
+          f"outputs={outputs} elem_counts={info.get('elem_counts', {})} "
+          f"golden_mode={'model-py' if use_model_py else 'golden-lib'}")
 
     # --- 1. write golden.py stub + compare.py + validation_runtime.py into run_dir ---
-    golden_lib_name = args.golden_lib.stem
-    (run_dir / "golden.py").write_text(
-        f"""#!/usr/bin/env python3
+    if use_model_py:
+        # Mode B: stub calls run_jit_golden.dump_bins, which imports the model
+        # under the repo venv + golden package, runs golden_fn, dumps *.bin.
+        # Metadata was already resolved above; this step just materializes bins.
+        # NB: stub filename must NOT be golden.py — it would shadow the repo
+        # golden package (circular import via `from golden import TensorSpec`).
+        (run_dir / "gen_golden.py").write_text(
+            f"""#!/usr/bin/env python3
+import sys
+from pathlib import Path
+SKILL = Path({str(_SKILL_DIR)!r})
+sys.path.insert(0, str(SKILL)); sys.path.insert(0, str(SKILL / "lib"))
+from run_jit_golden import dump_bins
+dump_bins(
+    model_py=Path({str(args.model_py.absolute())!r}),
+    mode={args.mode!r},
+    run_dir=Path("."),
+)
+""", encoding="utf-8")
+    else:
+        golden_lib_name = args.golden_lib.stem
+        (run_dir / "golden.py").write_text(
+            f"""#!/usr/bin/env python3
 import sys
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
@@ -224,10 +306,12 @@ if __name__ == "__main__":
     (run_dir / "outputs.txt").write_text("\n".join(outputs) + "\n", encoding="utf-8")
 
     # --- 2. write main.cpp + launch.cpp ---
+    elem_counts_override = model_meta.get("elem_counts") if use_model_py else None
     main_cpp = setup_main.gen_main_cpp(
         info, outputs,
-        load_vals={"ctx_len": consts.get("MAX_SEQ"), "ctx_blocks": consts.get("MAX_CTX_BLOCKS")},
-        consts=consts, scalar_sem_names=scalar_sem)
+        load_vals=load_vals,
+        consts=consts, scalar_sem_names=scalar_sem,
+        elem_counts_override=elem_counts_override)
     (run_dir / "main.cpp").write_text(main_cpp, encoding="utf-8")
     launch_cpp = setup_vpto.generate_launch_cpp(info)
     (run_dir / "launch.cpp").write_text(launch_cpp, encoding="utf-8")
@@ -297,9 +381,20 @@ if __name__ == "__main__":
 
     # --- 6. golden ---
     golden_env = dict(cann_env)
-    golden_env["PYTHONPATH"] = f"/tmp/mlir_core_vmi:{ptoas_source}/ptodsl:{str(build_root.absolute())}:{args.golden_lib.parent.absolute()}"
-    _run(["python3", str((run_dir / "golden.py").absolute())], env=golden_env,
-         cwd=str(run_dir.absolute()), label="golden")
+    if use_model_py:
+        # Mode B: needs torch + golden package → run under the repo venv.
+        venv_py = run_jit_golden._venv_python()
+        golden_env["PYTHONPATH"] = (
+            f"{_SKILL_DIR}:{_SKILL_DIR / 'lib'}:"
+            f"{args.model_py.parent.parents[1]}:{args.model_py.parent}")
+        gp = _run([venv_py, str((run_dir / "gen_golden.py").absolute())],
+                  env=golden_env, cwd=str(run_dir.absolute()), label="golden (model-py)")
+    else:
+        golden_env["PYTHONPATH"] = (
+            f"/tmp/mlir_core_vmi:{ptoas_source}/ptodsl:"
+            f"{str(build_root.absolute())}:{args.golden_lib.parent.absolute()}")
+        gp = _run(["python3", str((run_dir / "golden.py").absolute())],
+                  env=golden_env, cwd=str(run_dir.absolute()), label="golden (golden-lib)")
     # golden.py writes *.bin into its cwd (run_dir); the host binary also reads
     # ./vN.bin from its cwd (run_dir), so no extra linking is needed.
 
@@ -315,9 +410,20 @@ if __name__ == "__main__":
 
     # --- 8. compare ---
     cmp_env = dict(cann_env)
-    cmp_env["PYTHONPATH"] = f"{build_root.absolute()}:{args.golden_lib.parent.absolute()}"
-    cr = _run(["python3", str((run_dir / "compare.py").absolute())], env=cmp_env,
-              cwd=str(run_dir.absolute()), check=False, label="compare")
+    if use_model_py:
+        venv_py = run_jit_golden._venv_python()
+        cmp_env["PYTHONPATH"] = f"{build_root.absolute()}:{_SKILL_DIR}"
+        # pass tolerances via env so compare.py can pick them up
+        rtol = args.rtol if args.rtol is not None else 5e-3
+        atol = args.atol if args.atol is not None else 5e-3
+        cmp_env["VPTO_COMPARE_RTOL"] = str(rtol)
+        cmp_env["VPTO_COMPARE_ATOL"] = str(atol)
+        cr = _run([venv_py, str((run_dir / "compare.py").absolute())], env=cmp_env,
+                  cwd=str(run_dir.absolute()), check=False, label="compare (model-py)")
+    else:
+        cmp_env["PYTHONPATH"] = f"{build_root.absolute()}:{args.golden_lib.parent.absolute()}"
+        cr = _run(["python3", str((run_dir / "compare.py").absolute())], env=cmp_env,
+                  cwd=str(run_dir.absolute()), check=False, label="compare (golden-lib)")
     print(f"[vpto_run] compare exit: {cr.returncode}")
     print(f"[vpto_run] DONE. artifacts in {build_root}")
     if not args.keep and build_root.is_relative_to(Path("build_output")):
