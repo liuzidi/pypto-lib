@@ -26,11 +26,26 @@ export LLVM_BUILD=/data/c00862531/workspace/git/github/vpto-dev/llvm-project/bui
 export MLIR_CORE_SRC="$LLVM_BUILD/tools/mlir/python_packages/mlir_core"
 export PTO_SO=/data/liuzidi/PTOAS/build311/python/mlir/_mlir_libs/_pto.cpython-311-x86_64-linux-gnu.so
 export PTO_ISA_ROOT=/data/liuzidi/pto-isa
-export ASCEND_HOME_PATH=/usr/local/Ascend/cann-9.1.0-beta.3
+export PTO_ISA_PATH="$PTO_ISA_ROOT"
+export TILELANG_PATH="$PTOAS_SOURCE/lib/TileOps"
+export TILELANG_PKG="$PTOAS_SOURCE/tilelang-dsl/python"
 
-# --- 2. CANN + LLVM shared libs on the loader path -------------------------
+# --- 2. CANN — source the global set_env.sh FIRST (it may auto-detect a
+# newer/different CANN install and pollute ASCEND_HOME_PATH / TOOLCHAIN_HOME /
+# ASCEND_OPP_PATH), then override every CANN var back to the pinned beta.3
+# toolchain that ptoas 0.53 + bisheng + the .pto files were built against. ---
 export LD_LIBRARY_PATH="$LLVM_BUILD/lib:${LD_LIBRARY_PATH:-}"
 set +u; source /usr/local/Ascend/cann/set_env.sh 2>/dev/null; set -u
+export ASCEND_HOME_PATH=/usr/local/Ascend/cann-9.1.0-beta.3
+export ASCEND_TOOLKIT_HOME="$ASCEND_HOME_PATH"
+export ASCEND_OPP_PATH="$ASCEND_HOME_PATH/opp"
+export ASCEND_AICPU_PATH="$ASCEND_HOME_PATH"
+export TOOLCHAIN_HOME="$ASCEND_HOME_PATH/toolkit"
+export BISHENG_BIN="$ASCEND_HOME_PATH/bin/bisheng"
+# Prepend the pinned CANN's lib/bin to the front so it wins over any other
+# CANN install the global set_env.sh may have added.
+export LD_LIBRARY_PATH="$ASCEND_HOME_PATH/lib64:${LD_LIBRARY_PATH:-}"
+export PATH="$ASCEND_HOME_PATH/bin:$ASCEND_HOME_PATH/tools/bisheng_compiler/bin:$PATH"
 
 # --- 3. rebuild /tmp/mlir_core_vmi (ptodsl daemon's mlir_core + _pto.so) ---
 # /tmp is wiped on reboot; rebuild if missing or stale.
