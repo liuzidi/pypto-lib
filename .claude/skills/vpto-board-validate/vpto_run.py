@@ -143,6 +143,81 @@ def _nm_fatobj(fatobj: Path, kernel: str) -> dict:
     return info
 
 
+def _write_result_sidecar(path: Path, *, kernel: str, mode: str, device: int,
+                          exit_code: int, fatobj_info: dict,
+                          npu_stdout: str, compare_stdout: str,
+                          rtol: float | None = None, atol: float | None = None,
+                          error: str | None = None) -> None:
+    """Write run_dir/result.json with a stable schema for the sweep framework.
+
+    Parses the [TIMING] line from the NPU binary's stdout and the
+    max_diff/threshold/n_over fields from compare.py's stdout (both the
+    Mode B tolerance format and Mode A exact/ULP format). Missing fields
+    are null so the consumer never needs to guess.
+    """
+    import json, re
+
+    timing_ms = None
+    m = re.search(r"\[TIMING\] kernel=\S+ time=([\d.]+)\s*ms", npu_stdout or "")
+    if m:
+        timing_ms = float(m.group(1))
+
+    max_diff = None
+    n_over = None
+    n_total = None
+    threshold = None
+    compare_status = "unknown"  # "pass" | "fail" | "unknown"
+    # Mode B tolerance format: "[INFO] X compare passed: max_diff=Y threshold=Z"
+    # or "[ERROR] X compare failed: max_diff=Y threshold=Z n_over=A/B"
+    cm = re.search(
+        r"(passed|failed):\s*max_diff=([\d.eE+-]+)"
+        r"(?:\s+threshold=([\d.eE+-]+))?"
+        r"(?:\s+n_over=(\d+)/(\d+))?",
+        compare_stdout or "")
+    if cm:
+        compare_status = "pass" if cm.group(1) == "passed" else "fail"
+        max_diff = float(cm.group(2))
+        if cm.group(3) is not None:
+            threshold = float(cm.group(3))
+        if cm.group(4) is not None:
+            n_over = int(cm.group(4))
+            n_total = int(cm.group(5))
+    else:
+        # Mode A exact/ULP: "compare passed (exact match)" or "compare passed
+        # (max_ulp=N ...)" or "compare failed (name): max_ulp=..."
+        if "compare passed" in (compare_stdout or ""):
+            compare_status = "pass"
+        elif "compare failed" in (compare_stdout or ""):
+            compare_status = "fail"
+
+    if exit_code == 0 and compare_status == "unknown":
+        compare_status = "pass"
+    elif exit_code != 0 and compare_status == "unknown":
+        compare_status = "fail"
+
+    result = {
+        "kernel": kernel,
+        "mode": mode,
+        "device": device,
+        "pass": compare_status == "pass",
+        "compare_status": compare_status,
+        "exit_code": exit_code,
+        "max_diff": max_diff,
+        "n_over": n_over,
+        "n_total": n_total,
+        "threshold": threshold,
+        "timing_ms": timing_ms,
+        "rtol": rtol,
+        "atol": atol,
+        "fatobj_bytes": fatobj_info.get("size"),
+        "has_kernel_sym": fatobj_info.get("has_kernel_sym"),
+        "has_ctor": fatobj_info.get("has_ctor"),
+        "nested_elf_offsets": fatobj_info.get("nested_elf_offsets"),
+        "error": error,
+    }
+    path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="VPTO board-validation executor")
     ap.add_argument("--pto", required=True, type=Path)
@@ -407,6 +482,13 @@ if __name__ == "__main__":
              check=False, label="NPU run")
     if r.returncode != 0:
         print(f"[vpto_run] NPU run FAILED (exit {r.returncode})", file=sys.stderr)
+        _write_result_sidecar(
+            run_dir / "result.json", kernel=kernel, mode=args.mode,
+            device=args.device, exit_code=1, fatobj_info=fatobj_info,
+            npu_stdout=r.stdout, compare_stdout="",
+            rtol=(args.rtol if args.rtol is not None else 5e-3) if use_model_py else None,
+            atol=(args.atol if args.atol is not None else 5e-3) if use_model_py else None,
+            error=f"NPU run failed (exit {r.returncode})")
         return 1
 
     # --- 8. compare ---
@@ -427,6 +509,20 @@ if __name__ == "__main__":
                   cwd=str(run_dir.absolute()), check=False, label="compare (golden-lib)")
     print(f"[vpto_run] compare exit: {cr.returncode}")
     print(f"[vpto_run] DONE. artifacts in {build_root}")
+
+    # Write a structured result sidecar so the sweep framework (and any
+    # caller) can read per-run results without scraping stdout. Schema is
+    # stable; missing fields are null. Timing comes from the NPU binary's
+    # own [TIMING] stdout line; compare stats from compare.py's stdout
+    # (both Mode A exact/ULP and Mode B tolerance variants are handled).
+    _write_result_sidecar(
+        run_dir / "result.json", kernel=kernel, mode=args.mode,
+        device=args.device, exit_code=cr.returncode,
+        fatobj_info=fatobj_info, npu_stdout=r.stdout, compare_stdout=cr.stdout,
+        rtol=(args.rtol if args.rtol is not None else 5e-3) if use_model_py else None,
+        atol=(args.atol if args.atol is not None else 5e-3) if use_model_py else None,
+    )
+
     if not args.keep and build_root.is_relative_to(Path("build_output")):
         # keep build_output artifacts (they're gitignored) — do not auto-delete
         pass
