@@ -45,8 +45,24 @@ def parse_pto(pto_path: Path) -> dict:
     raw_params = m.group(2)
 
     pt = re.findall(r'%\w+:\s*!pto\.ptr<(\w+)>', raw_params)
+    # tensor-view name per ptr: from "%<view>__ssa_vN_view = pto.make_tensor_view %argM"
+    # the view stem (before __ssa) often encodes the originating jit-fn param
+    # name, which matches the model's TensorSpec name. Used by resolve_meta to
+    # build a ptr->spec mapping when ptr order != spec order.
+    view_names: dict[int, str] = {}
+    for vm in re.finditer(
+        r'%(\w+)__ssa_\w*\s*=\s*pto\.make_tensor_view\s+(%arg\d+)', text
+    ):
+        stem = vm.group(1)
+        # strip a trailing _inlineN (codegen rename) -> reveals the param stem
+        stem = re.sub(r'_inline\d+$', '', stem)
+        arg_idx = int(vm.group(2)[len('%arg'):])
+        view_names.setdefault(arg_idx, stem)  # first view wins if multiple
     for i, dtype in enumerate(pt):
-        info["params"].append({"name": f"v{i+1}", "pto_type": dtype, "arg": f"%arg{i}"})
+        info["params"].append({
+            "name": f"v{i+1}", "pto_type": dtype, "arg": f"%arg{i}",
+            "view_name": view_names.get(i, ""),
+        })
 
     # 匹配所有非 ptr 标量 (i32, index 等)，按签名顺序
     scalar_matchers = [

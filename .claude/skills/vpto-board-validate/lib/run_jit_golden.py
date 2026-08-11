@@ -1,3 +1,11 @@
+# Copyright (c) PyPTO Contributors.
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
+# Please refer to the License for details. You may not use this file except in compliance with the License.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# See LICENSE in the root of the software repository for the full text of the License.
+# -----------------------------------------------------------------------------------------------------------
 """run_jit_golden.py — generate golden inputs/outputs from a DSV4 model .py.
 
 The DSV4 models do NOT use the test_for_ptoas `*_golden_lib.py` contract
@@ -6,15 +14,25 @@ contract:
   - `<jit_fn>`              — the @pl.jit function; its param order matches the
                               .pto kernel's ptr-arg order (trailing index +
                               __pypto_spmd_* scalars are dropped).
-  - `build_tensor_specs(B, S)` -> [TensorSpec...] in the same order.
-  - `golden_fn(tensors)`    — fills outputs in-place.
-  - `MODES = {"decode": (B,S), "prefill": (B,S)}`.
+  - `build_tensor_specs(...)` -> [TensorSpec...] in the same order. The
+                              signature varies across models (8 variants:
+                              (B,S); (); (start_pos=None);
+                              (layer_id=0, num_tokens=T); (compress_ratio=4);
+                              (batch=, seq=); etc.). _call_build_tensor_specs
+                              inspects the signature and fills kwargs from
+                              config-derived B/S + mode-agnostic defaults.
+  - `golden_<name>(tensors)` — fills outputs in-place. The `_test` suffix is
+                              optional; _find_golden_fn tries both
+                              `golden_<stem>_test` and `golden_<stem>`, then
+                              falls back to a unique `golden_*` callable.
 
 Two entry points:
   - resolve_meta(model_py, mode, pto_info) -> dict: lightweight, no torch.
     Resolves outputs (is_output specs), ctx_len = B*S, np_types. Called by
     the skill BEFORE main.cpp generation (main.cpp needs to know which ptrs
-    are outputs to allocate+write them back).
+    are outputs to allocate+write them back). B/S come from config.py
+    constants (DECODE_BATCH/DECODE_SEQ, PREFILL_BATCH/PREFILL_SEQ), NOT from
+    MODES (which is __main__-only and unused here).
   - dump_bins(model_py, mode, run_dir) -> None: heavy, needs torch + golden
     package. Runs golden_fn on torch tensors, dumps vN.bin / golden_vN.bin
     into run_dir. Called as a subprocess (step 6 of the skill).
@@ -53,6 +71,72 @@ def _import_model(model_py: Path):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)  # type: ignore[union-attr]
     return mod
+
+
+# A snippet (run inside the .venv subprocess) that calls build_tensor_specs
+# with whatever signature the model declares. DSV4 models use 8 different
+# signatures (B,S; () ; start_pos=None; layer_id=0,num_tokens=T;
+# compress_ratio=4; batch=,seq=; etc.), so we cannot pass (B,S) positionally.
+# This mirrors _call_build_tensor_specs but is emitted as source for resolve_meta
+# (which runs torch-free and must serialize the call into a subprocess).
+_BTS_DISPATCH_SRC = """
+import inspect
+def _bts(mod, B, S):
+    sig = inspect.signature(mod.build_tensor_specs)
+    kw = {}
+    for n, p in sig.parameters.items():
+        if p.default is not inspect.Parameter.empty:
+            kw[n] = p.default
+        elif n in ("B", "batch"):
+            kw[n] = B
+        elif n in ("S", "seq"):
+            kw[n] = S
+        elif n in ("num_tokens", "T"):
+            kw[n] = B * S
+        elif n == "layer_id":
+            kw[n] = 0
+        elif n == "start_pos":
+            kw[n] = 0
+        elif n == "compress_ratio":
+            kw[n] = 4
+        else:
+            raise ValueError(f"build_tensor_specs required param {n!r} no default")
+    return mod.build_tensor_specs(**kw)
+"""
+
+
+def _call_build_tensor_specs(mod, B: int, S: int):
+    """Call mod.build_tensor_specs with whatever signature it declares.
+
+    DSV4 models use 8 different signatures (only 3/23 modules use (B,S)).
+    We inspect the params and fill defaults from config-derived B/S plus
+    mode-agnostic defaults (layer_id=0, start_pos=0, compress_ratio=4).
+    Raises ValueError if a required param has no default and isn't one we
+    know how to fill.
+    """
+    import inspect
+    sig = inspect.signature(mod.build_tensor_specs)
+    kwargs: dict = {}
+    for name, p in sig.parameters.items():
+        if p.default is not inspect.Parameter.empty:
+            kwargs[name] = p.default            # respect module's own default
+        elif name in ("B", "batch"):
+            kwargs[name] = B
+        elif name in ("S", "seq"):
+            kwargs[name] = S
+        elif name in ("num_tokens", "T"):
+            kwargs[name] = B * S
+        elif name == "layer_id":
+            kwargs[name] = 0
+        elif name == "start_pos":
+            kwargs[name] = 0
+        elif name == "compress_ratio":
+            kwargs[name] = 4
+        else:
+            raise ValueError(
+                f"build_tensor_specs has required param {name!r} with no "
+                f"known default; cannot call generically.")
+    return mod.build_tensor_specs(**kwargs)
 
 
 # torch dtype -> numpy dtype for .bin dump (bfloat16 has no numpy dtype;
@@ -118,13 +202,17 @@ def resolve_meta(model_py: Path, mode: str, pto_info: dict) -> dict:
     T = B * S
 
     # Spec list: build_tensor_specs needs the golden package (TensorSpec).
+    # DSV4 build_tensor_specs has 8 different signatures across models; we
+    # cannot pass (B,S) positionally. Emit the dispatch helper into the
+    # subprocess so it fills kwargs from signature defaults + B/S/T.
     code2 = (
-        "import importlib.util, sys, json\n"
+        "import importlib.util, sys, json, inspect\n"
         f"sys.path.insert(0, {str(model_dir)!r})\n"
         f"sys.path.insert(0, {str(repo_root)!r})\n"
         f"spec = importlib.util.spec_from_file_location('m', {str(model_py.absolute())!r})\n"
         "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\n"
-        f"specs = m.build_tensor_specs({B}, {S})\n"
+        + _BTS_DISPATCH_SRC
+        + f"specs = _bts(m, {B}, {S})\n"
         "print(json.dumps([{'name': s.name, 'is_output': getattr(s,'is_output',False), "
         "'dtype': str(s.dtype), 'shape': list(s.shape)} for s in specs]))\n"
     )
@@ -144,22 +232,26 @@ def resolve_meta(model_py: Path, mode: str, pto_info: dict) -> dict:
             f"(Phase 5, not yet supported)."
         )
 
-    # outputs: v<i+1> for each is_output spec (specs are in ptr-arg order)
-    outputs = [f"v{i+1}" for i, s in enumerate(specs) if s["is_output"]]
-    # np_types per v-name, from the .pto ptr dtype (ptr order == spec order)
-    np_types = {f"v{i+1}": _np_for_pto(ptr_params[i]["pto_type"])
-                for i in range(len(ptr_params))}
-    # elem_counts: product of spec shape dims (the full GM allocation size).
-    # DSV4 .pto have dynamic shapes ([%arg3, D] where %arg3 = T) that
-    # parse_pto can't reduce to a static count; the spec shape carries the
-    # resolved dims (T*D etc.), so main.cpp allocates the right size.
+    # Map each ptr to its spec. DSV4 .pto ptr order does NOT always match the
+    # model's build_tensor_specs order (e.g. hc_post: ptrs are [y, post, x,
+    # comb, residual] but specs are [x, residual, post, comb, y]). main.cpp
+    # numbers buffers by ptr order (v1=%arg0, v2=%arg1, ...) and dump_bins must
+    # write the matching spec's tensor to each vN. See _map_ptrs_to_specs.
+    ptr_to_spec = _map_ptrs_to_specs(ptr_params, specs)
+    spec_names = [s["name"] for s in specs]
+
+    # vN is in ptr order (v1=%arg0...); map to the spec's dtype/shape/output.
     def _prod(shape):
         n = 1
         for d in shape:
             n *= int(d)
         return n
-    elem_counts = {f"v{i+1}": _prod(specs[i]["shape"])
-                   for i in range(len(specs))}
+    outputs = [f"v{i+1}" for i, si in enumerate(ptr_to_spec)
+               if specs[si]["is_output"]]
+    np_types = {f"v{i+1}": _np_for_pto(_pto_of_torch(specs[si]["dtype"]))
+                for i, si in enumerate(ptr_to_spec)}
+    elem_counts = {f"v{i+1}": _prod(specs[ptr_to_spec[i]]["shape"])
+                   for i in range(len(ptr_params))}
 
     return {
         "outputs": outputs,
@@ -168,17 +260,98 @@ def resolve_meta(model_py: Path, mode: str, pto_info: dict) -> dict:
         "np_types": np_types,
         "elem_counts": elem_counts,
         "B": B, "S": S, "T": T,
-        "spec_names": [s["name"] for s in specs],
+        "spec_names": spec_names,
         "is_output": {s["name"]: s["is_output"] for s in specs},
+        "ptr_to_spec": ptr_to_spec,
+        "ptr_spec_names": [spec_names[si] for si in ptr_to_spec],
     }
 
 
-def dump_bins(model_py: Path, mode: str, run_dir: Path) -> None:
+def _pto_of_torch(td: str) -> str:
+    """torch dtype string (e.g. 'torch.bfloat16') -> pto ptr dtype ('bf16')."""
+    return {"torch.bfloat16": "bf16", "torch.float16": "f16",
+            "torch.float32": "f32", "torch.int8": "i8",
+            "torch.int32": "i32", "torch.int64": "i64"}.get(td, td)
+
+
+def _map_ptrs_to_specs(ptr_params: list, specs: list) -> list:
+    """Map each ptr (in .pto signature order) to its spec (in build_tensor_specs
+    order), returning a list of spec indices parallel to ptr_params.
+
+    DSV4 ptr order does NOT always equal spec order (hc_post: ptrs are
+    [y, post, x, comb, residual] vs specs [x, residual, post, comb, y]). We
+    match by longest-prefix of the ptr's tensor-view stem against spec names:
+    the view stem (e.g. "y_flat", "x", "residual_flat") comes from the jit-fn
+    param name, which equals the TensorSpec name. "y_flat" starts with spec
+    "y"; "residual_flat" starts with "residual"; longest spec-name match
+    disambiguates "x" vs "x_normed". Falls back to positional order when no
+    view_name matches (only valid when ptr order == spec order).
+
+    Raises ValueError if a ptr can't be mapped or dtypes disagree — that means
+    the kernel isn't a clean leaf module (ptrs are intermediates, Phase 5).
+    """
+    spec_names = [s["name"] for s in specs]
+    used: set[int] = set()
+    result: list[int] = []
+    for pi, ptr in enumerate(ptr_params):
+        vw = ptr.get("view_name", "")
+        si = None
+        if vw:
+            # view stem starts with a spec name -> the spec is the origin.
+            # Longest spec name wins (so "x_normed" beats "x" for that view).
+            # The reverse (sn.startswith(vw)) is intentionally NOT used: a view
+            # "x" being a prefix of spec "x_normed" does NOT mean ptr "x" feeds
+            # spec "x_normed" — it feeds spec "x".
+            candidates = [i for i, sn in enumerate(spec_names)
+                         if vw.startswith(sn) and i not in used]
+            if candidates:
+                candidates.sort(key=lambda i: -len(spec_names[i]))
+                si = candidates[0]
+        if si is None:
+            # positional fallback: ptr i -> spec i (only valid when orders match)
+            if pi < len(specs) and pi not in used:
+                si = pi
+        if si is None:
+            raise ValueError(
+                f"could not map ptr {ptr['arg']} (view={vw!r}) to any "
+                f"spec; not a clean leaf module.")
+        used.add(si)
+        result.append(si)
+
+    if len(used) != len(specs):
+        raise ValueError(
+            f"ptr->spec mapping left some specs unmapped "
+            f"({len(used)}/{len(specs)}); not a clean leaf module.")
+
+    # dtype consistency: ptr pto dtype must match the mapped spec's torch dtype.
+    # A mismatch (ptr f32 but spec bf16) means main.cpp would allocate the
+    # wrong buffer size and mis-read the golden bin — not a clean leaf.
+    for i, ptr in enumerate(ptr_params):
+        si = result[i]
+        ptr_dt = ptr["pto_type"]
+        spec_dt = _pto_of_torch(specs[si]["dtype"])
+        if ptr_dt != spec_dt:
+            raise ValueError(
+                f"dtype mismatch at ptr {ptr['arg']} (view="
+                f"{ptr.get('view_name','')!r}, pto={ptr_dt}) vs spec "
+                f"{spec_names[si]!r} (torch={specs[si]['dtype']} -> pto={spec_dt}); "
+                f"not a clean leaf module.")
+    return result
+
+
+def dump_bins(model_py: Path, mode: str, run_dir: Path,
+              pto_path: Path | None = None) -> None:
     """Heavy golden generation: import the model under torch + golden package,
     run golden_fn, write vN.bin (inputs) + golden_vN.bin (outputs) into run_dir.
 
     run_dir is CWD when called as a subprocess (the skill sets cwd=run_dir).
     DSV4 MODES is __main__-only, so B/S come from config.py directly.
+
+    pto_path (Mode B): the .pto file, needed to map ptr-arg order to spec
+    order. vN is numbered by ptr order (v1=%arg0...) so main.cpp reads the
+    right buffer for each kernel arg; dump_bins writes each spec's tensor to
+    the vN of its mapped ptr. Without this, ptr order != spec order (hc_post)
+    would mis-feed inputs to outputs and vice versa.
     """
     model_dir = model_py.parent.resolve()
     repo_root = model_dir.parents[1]  # pypto-lib/
@@ -203,11 +376,13 @@ def dump_bins(model_py: Path, mode: str, run_dir: Path) -> None:
     b_attr, s_attr = mode_attrs[mode]
     B, S = getattr(cfg, b_attr), getattr(cfg, s_attr)
 
-    specs = mod.build_tensor_specs(B, S)
+    specs = _call_build_tensor_specs(mod, B, S)
 
     golden_fn = _find_golden_fn(mod, model_py.stem)
     if golden_fn is None:
-        raise ValueError(f"{model_py}: no golden_<name>_test fn found")
+        raise ValueError(f"{model_py}: no golden fn found (tried "
+                         f"golden_{model_py.stem}_test, golden_{model_py.stem}, "
+                         f"and unique golden_* fallback)")
 
     tensors: dict[str, torch.Tensor] = {}
     for spec in specs:
@@ -224,8 +399,31 @@ def dump_bins(model_py: Path, mode: str, run_dir: Path) -> None:
 
     golden_fn(tensors)
 
-    for i, spec in enumerate(specs):
-        vname = f"v{i+1}"
+    # Map ptrs (pto signature order) to specs (build_tensor_specs order).
+    # vN is numbered by ptr order (v1=%arg0...) so that main.cpp feeds each
+    # kernel arg the right buffer. Without this, ptr order != spec order
+    # (hc_post: [y,post,x,comb,residual] vs [x,residual,post,comb,y]) would
+    # write the output tensor into v1 (kernel arg0=input y_flat) etc.
+    if pto_path is not None:
+        # parse_pto is in the same lib dir; import it absolutely (dump_bins
+        # runs as a subprocess where sys.path has SKILL/lib prepended, so
+        # there is no parent package for a relative import).
+        import pto_parse
+        pto_info = pto_parse.parse_pto(Path(pto_path))
+        ptr_params = [p for p in pto_info["params"]
+                     if p["pto_type"] not in ("i32", "index")]
+        # normalize TensorSpec objects to dicts (same shape as resolve_meta's
+        # subprocess JSON) so _map_ptrs_to_specs sees a uniform type.
+        spec_dicts = [{"name": s.name, "is_output": getattr(s, "is_output", False),
+                       "dtype": str(s.dtype), "shape": list(s.shape)}
+                      for s in specs]
+        ptr_to_spec = _map_ptrs_to_specs(ptr_params, spec_dicts)
+    else:
+        ptr_to_spec = list(range(len(specs)))  # positional (Mode A fallback)
+
+    for ptr_i, spec_i in enumerate(ptr_to_spec):
+        spec = specs[spec_i]
+        vname = f"v{ptr_i+1}"
         arr = _torch_to_np(tensors[spec.name])
         arr.tofile(run_dir / f"{vname}.bin")
         if getattr(spec, "is_output", False):
@@ -233,20 +431,42 @@ def dump_bins(model_py: Path, mode: str, run_dir: Path) -> None:
 
 
 def _find_golden_fn(mod, model_stem: str):
-    """DSV4 convention: golden_<name>_test where <name> matches the model.
-    E.g. rmsnorm.py -> golden_rms_norm_test; hc_pre.py -> golden_hc_pre_test."""
+    """Find the golden reference fn. DSV4 naming is inconsistent:
+    rmsnorm.py -> golden_rms_norm_test; hc_post.py -> golden_hc_post;
+    hc_head.py -> golden_hc_head. Try strict-then-loose candidates."""
+    # Try the two DSV4 naming conventions first (with and without _test suffix).
     candidates = [
         f"golden_{model_stem}_test",
-        f"golden_{model_stem}_test",
+        f"golden_{model_stem}",
     ]
-    # also try the jit fn stem (rmsnorm.py -> rms_norm_test -> golden_rms_norm_test)
-    for name in dir(mod):
-        if name.startswith("golden_") and name.endswith("_test"):
-            candidates.append(name)
     for c in candidates:
         fn = getattr(mod, c, None)
         if fn is not None:
             return fn
+    # Fallback: scan all non-prefill golden_* callables. When a module defines
+    # both golden_<x> and golden_<x>_prefill, the non-prefill one is decode's.
+    # When multiple non-prefill fns exist (common: golden_<x> helper + the
+    # golden_<x>_test entry point), prefer the _test-suffixed one — it is the
+    # DSV4 convention for the callable that fills tensors in-place. This also
+    # bridges the filename-stem vs fn-name gap (rmsnorm.py exposes
+    # golden_rms_norm_test, not golden_rmsnorm_test).
+    gfs = [n for n in dir(mod)
+           if n.startswith("golden_") and callable(getattr(mod, n))
+           and not n.endswith("_prefill")]
+    if len(gfs) == 1:
+        return getattr(mod, gfs[0])
+    if len(gfs) > 1:
+        test_suffixed = [n for n in gfs if n.endswith("_test")]
+        if len(test_suffixed) == 1:
+            return getattr(mod, test_suffixed[0])
+        # multiple _test fns — prefer the one whose name (minus golden_/_test)
+        # normalized (drop underscores) matches the stem normalized
+        def _norm(s):
+            return s.replace("golden_", "").replace("_test", "").replace("_", "")
+        stem_n = _norm("golden_" + model_stem + "_test")
+        stem_matches = [n for n in test_suffixed if _norm(n) == stem_n]
+        if len(stem_matches) == 1:
+            return getattr(mod, stem_matches[0])
     return None
 
 

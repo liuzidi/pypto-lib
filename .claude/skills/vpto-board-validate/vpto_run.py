@@ -284,6 +284,7 @@ dump_bins(
     model_py=Path({str(args.model_py.absolute())!r}),
     mode={args.mode!r},
     run_dir=Path("."),
+    pto_path=Path({str(args.pto.absolute())!r}),
 )
 """, encoding="utf-8")
     else:
