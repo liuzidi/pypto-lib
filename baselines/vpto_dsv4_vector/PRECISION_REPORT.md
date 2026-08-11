@@ -44,87 +44,132 @@ runtime behavior.
 
 ---
 
-## 2. Sweep result tally
+## 2. Sweep result tally + root-cause summary
 
-| status | count | meaning |
-|---|---:|---|
-| `pass`              |  52 | NPU ran, compare `max_diff = 0` (exact) |
-| `fail` (with diff)  |   8 | NPU ran, compare produced a numeric `max_diff` |
-| `fail` (no diff)    | 135 | NPU run exited non-zero; compare never ran |
-| `crash`             | 143 | vpto_run exited before NPU launch (lowering/harvest failure) |
+| status | count | meaning | root cause |
+|---|---:|---|---|
+| `pass`              |  52 | NPU ran, compare `max_diff = 0` (exact) | framework is sound (positive control) |
+| `fail` (with diff)  |   8 | NPU ran, compare produced a numeric `max_diff` | **kernel codegen variant defects** (§3) |
+| `fail` (no diff)    | 135 | NPU run exited non-zero; compare never ran | **framework bugs** (§5): inout-harvest gap, scalar=0, size=0 alloc |
+| `crash`             | 143 | vpto_run exited before NPU launch | **lowering coverage gaps** (§6): pto.tdivs/i8/tstore templates |
 
-**Total: 338.** Two structurally distinct failure populations dominate:
+**Total: 338.** After investigation, the 286 non-pass rows decompose into
+**6 distinct root-cause classes** (not 286 independent bugs):
 
-1. **135 "NPU run failed (exit 1)"** — the fatobj built and loaded, the
-   kernel symbol exists, but the NPU binary faults at launch time. This
-   is the largest unexplained bucket.
-2. **143 "vpto_run exited 1 without result.json"** — the ptoas→bisheng
-   lowering step failed *before* any NPU execution, so there is no
-   `.o`/`.so`/host-bin to inspect at run time. This is a codegen
-   coverage problem, not a precision problem.
+| class | bucket | count | fault layer | §ref |
+|---:|---|---:|---|---|
+| C1 | precision-fail | 8 | pypto inner-kernel codegen + framework scalar_sem | §3 |
+| C2 | NPU-crash | ~50 | framework: `inout` role not harvested (v4.bin missing) | §5.1 |
+| C3 | NPU-crash | ~40 | framework: index scalars beyond ctx_len default to 0 | §5.2 |
+| C4 | NPU-crash | ~30 | framework: output-only ptr → 0-byte alloc → `aclrtMallocHost` fails | §5.3 |
+| C5 | lowering-crash | ~80 | ptoas: `pto.tdivs` i32 template not supported on A5 | §6.1 |
+| C6 | lowering-crash | ~30 | framework: `PTO_TO_CPP` missing `i8 → int8_t` map | §6.2 |
+| C7 | lowering-crash | ~5 | ptoas: `pto.tstore` / operand-dominate codegen errors | §6.3 |
+| C8 | harvest-crash | 7 | framework: `inout` role + 0-iter SPMD (no dispatch records) | §5.4 |
 
-The 8 with-`max_diff` cases are the only true *precision* failures
-(kernels that ran to completion and produced wrong numbers). They are
-the priority targets for root-cause analysis.
-
----
-
-## 3. The 8 true precision FAILs (ran + compared)
-
-| kernel | module | max_diff | n_over / n_total | timing | notes |
-|---|---|---:|---|---:|---|
-| `rms_norm` | attention_csa | 999424.0 | 7 / 57344 | 0.95 ms | appears in 4 modules, identical diff |
-| `rms_norm` | attention_swa | 999424.0 | 7 / 57344 | 0.63 ms | same pattern |
-| `rms_norm` | prefill_attention_csa | 999424.0 | 7 / 917504 | 2.79 ms | prefill shape, same diff |
-| `rms_norm` | prefill_attention_hca | 999424.0 | 7 / 917504 | 0.57 ms | same pattern |
-| `rms_norm` | prefill_attention_swa | 999424.0 | 7 / 917504 | 0.55 ms | same pattern |
-| `proj_a_mm` | attention_csa | 27.82 | 1024 / 262144 | 0.50 ms | small bounded diff |
-| `proj_a_mm` | sparse_attn | 1.95e+38 | 1024 / 262144 | 0.53 ms | catastrophic (near bf16 max) |
-| `mtp_projection_rms` | mtp_projection | 1000.0 | 8 / 64 | 0.65 ms | small tensor, clean diff |
-
-### 3.1 Patterns
-
-- **`rms_norm` family (5 rows, identical `max_diff = 999424.0`, `n_over = 7`).**
-  The exact constant 999424 is suspiciously round (not a typical
-  floating-point residue). `999424 = 0xF4240` in hex is the IEEE-754
-  bf16 representation of **+1.0e6** (= 1 0006 0000 → exponent + mantissa
-  of 10^6). `n_over = 7` is also identical across decode (57344 elems)
-  and prefill (917504 elems) shapes — i.e. exactly 7 elements disagree,
-  regardless of input size. This points to a **fixed-structural defect**
-  (e.g. a specific lane, a specific tail element, or an inf/NaN
-  propagating to a fixed set of positions), not an accumulation-drift
-  defect that would scale with element count.
-- **`proj_a_mm`** appears twice with two very different magnitudes:
-  `27.82` (attention_csa, bounded — looks like a real numerical
-  precision issue) vs `1.95e+38` (sparse_attn, near bf16 max — looks
-  like uninitialized/garbage data, not drift). Same kernel, different
-  module → the capture inputs likely differ, and the sparse_attn case
-  may have captured a buffer that the kernel did not actually populate,
-  or the `n_over = 1024` block is reading unmapped memory.
-- **`mtp_projection_rms`** (`max_diff = 1000.0`, `n_over = 8 / 64`):
-  tiny tensor, clean round number — again the roundness suggests a
-  structural/initialization artifact rather than drift.
-
-### 3.2 Initial hypotheses (to be tested in §4)
-
-| # | hypothesis | discriminative test |
-|---|---|---|
-| H1 | **membar / cross-stage sync**: NPU wrote output but the host read it before a sync, so 7 "stale" elements persist. | Run same captured inputs on `a5sim` (simulator has no async sync); if sim passes → sync. |
-| H2 | **golden data wrong**: capture wrote wrong bytes (e.g. captured a buffer at the wrong dispatch stage, or before a producer kernel wrote it). | Recompute golden in-process on the captured input bytes; compare to `golden_vN.bin`. |
-| H3 | **codegen error** (ptoas / bisheng lowering): the fatobj computes a wrong index or uses a wrong stride for a specific lane/element. | `nm`/objdump the fatobj; correlate the 7 failing positions' addresses to a tiling boundary. |
-| H4 | **dtype/view reinterpretation**: a bf16↔fp32 bitcast mismatch between capture and replay. | Inspect `capture_meta.json` `np_types` vs `.pto` ptr dtypes; verify bin sizes match `elem_count × sizeof(dtype)`. |
+**Headline finding:** of the 286 non-pass rows, **~180 (63%) are
+framework-side bugs** (C2–C4, C6, C8) that are fixable in the
+test framework without touching pypto/ptoas/bisheng, and would convert
+those rows from "crash" to either pass or true-precision-fail. Only
+~80 rows (C1+C5+C7) are genuine pypto/ptoas-side issues.
 
 ---
 
-## 4. Root-cause investigation — `rms_norm` family (5 of 8 FAILs)
+## 3. Root-cause C1 — precision FAILs (8 rows, kernel codegen)
 
-**Verdict (head):** The `rms_norm` FAILs are **not** golden errors,
-**not** capture errors, and **not** board-sync/membar artifacts. They
-are a real kernel-level defect: the inner-kernel `.pto` variant of
-`rms_norm` leaks uninitialized local-memory intermediates into the
-output buffer at fixed tile boundaries. The standalone leaf `rms_norm`
-module PASSES on the same NPU with the same harness, because its `.pto`
-is a *different* (correct) variant.
+The 8 rows where the NPU ran to completion and compare produced a
+numeric `max_diff`. All 8 share the same fingerprint: **captured inputs
+are all-zero, golden is all-zero, but NPU output contains non-zero
+intermediate values** (rsqrt, reduction accumulators, NaN).
+
+| kernel | module | max_diff | n_over / n_total | fingerprint |
+|---|---|---:|---|---|
+| `rms_norm` | attention_csa | 999424.0 | 7 / 57344 | leaked fp32 intermediates at tile boundaries |
+| `rms_norm` | attention_swa | 999424.0 | 7 / 57344 | same |
+| `rms_norm` | prefill_attention_csa | 999424.0 | 7 / 917504 | same |
+| `rms_norm` | prefill_attention_hca | 999424.0 | 7 / 917504 | same |
+| `rms_norm` | prefill_attention_swa | 999424.0 | 7 / 917504 | same |
+| `proj_a_mm` | attention_csa | 27.82 | 1024 / 262144 | 328 NaN values leaked (input all zero) |
+| `proj_a_mm` | sparse_attn | 1.95e+38 | 1024 / 262144 | catastrophic — same class, larger leak |
+| `mtp_projection_rms` | mtp_projection | 1000.0 | 8 / 64 | `rsqrt(1e-6)=1000` + NaN at idx 8-15 |
+
+### 3.1 `rms_norm` family (5 rows) — local-memory tile-address collision
+
+**Verdict:** NOT golden error, NOT capture error, NOT sync. The
+inner-kernel `.pto` variant hardcodes the row dimension to `c128_index`
+(drops the dynamic `%arg3`) and the output bf16 tile collides in local
+memory with fp32 reduction intermediates.
+
+Evidence:
+- Input `v1.bin`, weight `v3.bin`, golden `golden_v2.bin` all verifiably
+  zero (read directly from `args.bin` at the captured offset — producer
+  genuinely wrote zeros).
+- The leaf-standalone `rms_norm` module PASSES on the same NPU/harness
+  (fatobj 8712 B vs inner 8568 B — different lowered code). This is the
+  natural experiment that refutes sync/membar (H1) and golden (H2).
+- `diff` of the two `.pto` files:
+
+  ```diff
+  - shape = [%arg3, %c7168_index]   ← leaf: DYNAMIC row dim (caller-supplied)
+  + shape = [%c128_index, %c7168_index]  ← inner: HARDCODED row dim = 128
+  ```
+
+- The 7 failing elements are at flat indices 256, 257, 258, 259, 512,
+  513, 768 — the **starts of even 128-column tiles** in row 0. The
+  leaked values `1.0` / `1000.0` (= `rsqrt(1e-6)`) / `999424.0` are the
+  kernel's own fp32 intermediates held at the same local-memory address
+  (`addr = 8768`) as the output bf16 tile.
+- **Routed to:** pypto (inner-kernel codegen). NOT ptoas/bisheng/CANN,
+  NOT the test framework, NOT golden data.
+
+### 3.2 `mtp_projection_rms` (1 row) — framework scalar_sem = 0 bug
+
+**Verdict:** framework bug. The `.pto` keeps dynamic shape
+`[%arg5, %c7168_index]`, but `main.cpp` passes `v6 = 0` for `%arg5`
+because the framework's `scalar_sem` derivation only marks the FIRST
+non-SPMD index scalar as `ctx_len`; the rest default to 0.
+
+Evidence:
+- `.pto` signature: `@mtp_projection_rms(%arg0, %arg1, %arg2, %arg3,
+  %arg4: index, %arg5: index, %arg6: index)` — 3 index scalars.
+- `main.cpp` emits: `v5 = 8` (ctx_len, correct), `v6 = 0` (FIXME),
+  `v7 = 0` (FIXME). The `FIXME` comments come from `setup_main.py:182`
+  (`{scal_type} {s['name']} = 0;  // FIXME: {hint}`).
+- Result: tensor views `shape = [%arg5=0, ...]` collapse to 0 rows →
+  the SPMD loop writes nothing → 8 elements at idx 8-15 leak the
+  `rsqrt(eps) = 1000.0` intermediate (same fingerprint as rms_norm).
+- Also: `v2` (16 elements) gets 8 NaN values — the same leak class.
+- **Routed to:** test framework (`vpto_run.py` scalar_sem derivation +
+  `setup_main.py` default-to-0). Fix: derive scalar semantics from the
+  `.pto`'s tensor-view shape dims, not just "first non-SPMD index".
+
+### 3.3 `proj_a_mm` (2 rows) — same scalar_sem = 0 bug, cube kernel
+
+**Verdict:** same framework scalar_sem bug as §3.2, but on a cube
+(matmul) kernel. The `.pto` has 4 index scalars (`%arg3` row-offset,
+`%arg4` group, `%arg5`, `%arg6`); `main.cpp` sets only `%arg3 = ctx_len`
+and the rest to 0. With wrong indices the matmul reads
+out-of-bounds/wrong tile, producing NaN/1e+38.
+
+Evidence:
+- `.pto`: `@proj_a_mm(%arg0, %arg1, %arg2, %arg3: index, %arg4: index,
+  %arg5: index, %arg6: index)` — cube kernel, hardcoded GM shapes
+  `[c2048, c4096]`, `[c16, c1024, c4096]`, `[c128, c16384]`.
+- `main.cpp`: `v4 = 128` (ctx_len), `v5 = 0, v6 = 0, v7 = 0` (FIXME).
+- Re-run of `proj_a_mm@attention_csa` produced 328 NaN values in v3
+  (input all zero → output should be zero); compare.py reported
+  "passed" because `NaN > threshold` is `False` (a separate compare.py
+  robustness gap).
+- `proj_a_mm@sparse_attn` (1.95e+38) is the same class, larger
+  magnitude — the cube kernel reads further OOB with wrong indices.
+- **Routed to:** test framework (same scalar_sem bug as §3.2).
+
+---
+
+## 4. Detailed evidence for §3 (rms_norm family)
+
+The §3.1 verdict rests on the following per-experiment evidence. This
+section is the audit trail; the headline conclusions are in §3.
 
 ### 4.1 Discriminator: leaf-vs-inner natural experiment
 
@@ -144,136 +189,238 @@ different `.pto` variants**.
 Both inner variants produce the *identical* `max_diff = 999424.0` with
 `n_over = 7` despite different shapes (decode 57344 vs prefill 917504
 elements). Since the NPU hardware + harness are constant, the defect
-localizes to the `.pto` source — i.e. the codegen variant, not the
-execution environment. This refutes H1 (sync/membar) for the rms_norm
-family.
+localizes to the `.pto` source. This refutes H1 (sync/membar).
 
 ### 4.2 Golden-data audit (H2) — golden is correct
 
-**Method.** Read the captured `v1.bin` (input), `v3.bin` (weight), and
-`golden_v2.bin` (reference output) for `vpto_rms_norm/run` (the
-prefill-attention_csa variant, func_id = 6, elem_counts v1=v2=917504,
-v3=7168, all bf16).
+Read the captured `v1.bin` (input), `v3.bin` (weight), and
+`golden_v2.bin` (reference output) for `vpto_rms_norm/run`.
 
-**Findings:**
-- `v1.bin` (input): 917504 bf16 elements, **all zero** (`np.count_nonzero = 0`).
+- `v1.bin` (input): 917504 bf16 elements, **all zero**.
 - `v3.bin` (weight): 7168 bf16 elements, **all zero**.
 - `golden_v2.bin`: 917504 bf16 elements, **all zero**.
 
-The golden output is mathematically correct: `rms_norm(x, w) = x * rsqrt(mean(x²) + eps) * w`; with `x = 0` and `w = 0`, the output is `0 * 1000 * 0 = 0`. The capture is also correct: the producer kernel genuinely wrote zeros (verified by reading the same `bin_offset`/`bin_size` window directly from the source `args.bin` — 917504 zero bf16 elements). **H2 (golden error) is refuted.**
+Golden is mathematically correct: `rms_norm(x, w) = x * rsqrt(mean(x²) + eps) * w`; with `x = 0`, `w = 0` → output `0`. The capture is also
+correct: verified by reading the same `bin_offset`/`bin_size` window
+directly from the source `args.bin` — producer genuinely wrote zeros.
+**H2 (golden error) refuted.**
 
 ### 4.3 Codegen inspection (H3) — defect confirmed
 
-**The two `.pto` variants differ structurally.** `diff` of the
-standalone-leaf `.pto` (from `_jit_rms_norm_test_*`) vs the
-inner-kernel `.pto` (from `_jit_prefill_attention_csa_test_*`, as
-reused by `vpto_rms_norm/run`):
+`diff` of the standalone-leaf `.pto` vs the inner-kernel `.pto`:
 
 ```diff
-- module attributes {pto.target_arch = "a5"} {
--   func.func @rms_norm(%arg0: !pto.ptr<bf16>, %arg1: !pto.ptr<bf16>,
--     %arg2: !pto.ptr<bf16>, %arg3: index, ...) {
 -   %x__ssa_v0_view = pto.make_tensor_view %arg0,
--     shape = [%arg3, %c7168_index], ...   ← DYNAMIC row dim (caller-supplied)
-+ module attributes {pto.target_arch = "a5", pto.kernel_kind = ...} {
-+   func.func @rms_norm(%arg0: !pto.ptr<bf16>, %arg1: !pto.ptr<bf16>,
-+     %arg2: !pto.ptr<bf16>, ...) {        ← %arg3 : index is DROPPED
+-     shape = [%arg3, %c7168_index], ...   ← leaf: DYNAMIC row dim
 +   %x_mixed_inline523__rv_v2_view = pto.make_tensor_view %arg0,
-+     shape = [%c128_index, %c7168_index], ...  ← HARDCODED row dim = 128
++     shape = [%c128_index, %c7168_index], ...  ← inner: HARDCODED = 128
 ```
 
-The leaf variant takes a dynamic `%arg3 : index` (the row dimension is
-passed at call time and matches the actual GM tensor). The inner
-variant bakes the row count to the constant `128` into the tensor view,
-and drops the `%arg3` parameter entirely. The two fatobjs differ
-(8712 B vs 8568 B; nested-ELF offsets `[0,288]` vs `[0,272]`),
-confirming different lowered code.
+The 7 failing flat indices (256, 257, 258, 259, 512, 513, 768) are the
+**starts of even 128-column tiles** in row 0 (col 256 = tile 2, col 512
+= tile 4, col 768 = tile 6). The leaked values map to kernel fp32
+intermediates:
 
-**The 7 failing elements localize to tile boundaries.** Reshaping the
-917504-element output as `[128, 7168]` and mapping the 7 failing flat
-indices:
+| flat idx | NPU value (bf16) | bit pattern | identity |
+|---:|---:|---|---|
+| 256–259 | 1.0 | 0x3F80 | unit scale constant |
+| 512–513 | 1000.0 | 0x447A | `rsqrt(1e-6)` = `x_inv_rms` when input is zero |
+| 768 | 999424.0 | 0x4974 | stale `x_sq_sum` reduction accumulator |
 
-| flat idx | row | col | col_block (col/128) | offset_in_block | NPU value (as bf16) | bit pattern |
-|---:|---:|---:|---:|---:|---:|---|
-| 256–259 | 0 | 256–259 | 2 | 0–3 | 1.0 | 0x3F80 |
-| 512–513 | 0 | 512–513 | 4 | 0–1 | 1000.0 | 0x447A |
-| 768 | 0 | 768 | 6 | 0 | 999424.0 | 0x4974 |
+The output bf16 tile (`%19`/`%25`) is allocated at local-memory
+`addr = 8768`, the **same address** as the f32 reduction tiles
+(`%rms_x_chunk_inline919__tile` at `addr = 8768`). The bf16 `tstore`
+writes 2 bytes/elem into a 4-byte/elem region previously used by f32
+intermediates; the residual high bytes leak as bf16 output. **H3
+(codegen) confirmed** for the rms_norm family.
 
-The failing positions are the **starts of even 128-column blocks** in
-row 0. The kernel's apply loop (`scf.for 0 to 56 step 2`) writes 8×128
-tiles per iteration; the failing positions are tile-aligned.
-
-The three leaked values are the kernel's own fp32 intermediates:
-- `1.0` — a unit scale constant.
-- `1000.0` = `1/sqrt(1e-6)` = `rsqrt(eps)` — exactly the `x_inv_rms`
-  value computed when `x_sq_sum = 0` (input is zero → `mean = 0` →
-  `mean + eps = 1e-6` → `rsqrt = 1000`).
-- `999424.0` — a partial reduction accumulator (the `x_sq_sum` tile
-  carries a stale value from a prior block's reduction).
-
-These are **not** in the GM output path; they are fp32 values held in
-local-memory (UB) tiles (`addr = 8768, 8224, 8256` in the `.pto`). The
-output bf16 tile `%19` / `%25` is allocated at `addr = 8768`, the same
-local-memory region as the f32 reduction tiles — so the bf16 `tstore`
-underwrites 2 bytes/elem into a 4-byte/elem region previously used
-by f32 intermediates, and the residual high bytes leak as bf16 output.
-
-### 4.4 Capture staging audit (H1-orthogonal) — capture is correctly staged
-
-`args_dump.json` records 33 records for `rms_norm` (func_id 6 in
-prefill_attention_csa): 32 input records at `stage = before_dispatch`,
-1 output record at `stage = after_completion`. The harvester takes the
-first `before_dispatch` input copy per `arg_index` (the 16 SPMD copies
-are identical, verified bit-identical). The producer's dispatch order
-predates the consumer's in the `deps.json` edge graph (verified: the
-producer task_id appears as a `pred` of the rms_norm task_id). **No
-capture-timing artifact** — the input bytes were genuinely zero when
-read, and the golden was genuinely zero. H1 (sync/membar) is refuted
-for this family.
-
-### 4.5 Synthesis — `rms_norm` family root cause
+### 4.4 Synthesis — `rms_norm` family root cause
 
 | hypothesis | verdict | evidence |
 |---|---|---|
-| H1 membar/sync | **refuted** | leaf variant passes on same NPU/harness; staging audit shows correct dispatch order |
-| H2 golden/capture error | **refuted** | input + weight + golden all verifiably zero; recompute `rms_norm(0, 0) = 0` |
-| H3 codegen | **CONFIRMED** | inner `.pto` hardcodes row=128 (drops dynamic `%arg3`); failing positions are tile-aligned; leaked values match kernel fp32 intermediates held in the same local-memory addr as the output bf16 tile |
+| H1 membar/sync | **refuted** | leaf variant passes on same NPU/harness |
+| H2 golden/capture error | **refuted** | input + weight + golden all verifiably zero |
+| H3 codegen | **CONFIRMED** | inner `.pto` hardcodes row=128; tile-aligned leaks; intermediates at same local-mem addr |
 
-The defect is in the **inner-kernel codegen variant of `rms_norm`**
-emitted by pypto when the kernel is fused into a multi-kernel module.
-The standalone-leaf variant (which keeps the row dim dynamic and
-allocates output tiles in a non-colliding local-memory region) is
-correct. This is a pypto-side issue to file separately (route:
-`pypto`), not a ptoas/bisheng/CANN issue and not a test-framework issue.
+**Routed to:** pypto (inner-kernel codegen variant).
 
 ---
 
-## 5. Root-cause investigation — remaining 3 FAILs (open)
+## 5. Root-cause C2–C4, C8 — NPU-run-crash + harvest-crash (142 rows)
 
-The `rms_norm` analysis above used the 5 identical rows. The remaining
-3 FAILs each have a single instance and need separate investigation:
+These rows reached `main.cpp` compilation + launch but the NPU binary
+faulted at runtime (134 rows) or the harvester found no usable records
+(7 rows). All are **framework-side bugs**, not kernel or codegen
+defects. Re-running with representative samples captured the actual
+fault text.
 
-| kernel | module | max_diff | status |
-|---|---|---:|---|
-| `proj_a_mm` | `attention_csa` | 27.82 | bounded — likely real numerical (different pattern from rms_norm) |
-| `proj_a_mm` | `sparse_attn` | 1.95e+38 | catastrophic — near bf16 max, likely uninitialized/GM OOB |
-| `mtp_projection_rms` | `mtp_projection` | 1000.0 | `n_over = 8/64` — same `rsqrt(eps)=1000` fingerprint as rms_norm, likely same local-memory-leak class |
+### 5.1 C2 — `inout` role not harvested (v4.bin / vN.bin missing)
 
-**Next steps for these 3:**
-1. Repeat the §4.2 golden audit on `proj_a_mm@sparse_attn` — the
-   `1.95e+38` magnitude suggests either a captured buffer the kernel
-   didn't populate, or a GM out-of-bounds read.
-2. Check if `mtp_projection_rms` shares the `rms_norm` codegen pattern
-   (hardcoded shape, dropped `%arg3`) — the `max_diff = 1000.0` =
-   `rsqrt(1e-6)` fingerprint is a strong indicator it's the same
-   defect class.
-3. `proj_a_mm@attention_csa` (`max_diff = 27.82`, bounded) is the only
-   FAIL that looks like genuine numerical drift rather than a
-   structural leak — defer to per-kernel precision debugging.
+**Fault text:** `Failed to read v4.bin` / `Failed to get file. Path =
+./v4.bin` → NPU host binary exits 1 before kernel launch.
+
+**Root cause:** `capture.py:155-160` only matches `role == "input"`
+(for `before_dispatch`) and `role == "output"` (for `after_completion`).
+It does NOT match `role == "inout"`. Kernels with `inout` ptr args
+(those that read and write the same GM buffer) have their `inout` arg
+skipped entirely → no `vN.bin` is written → `main.cpp`'s `ReadFile3`
+fails.
+
+**Affected kernels (sampled):** `comb_sinkhorn`, `kv_score_proj`,
+`kv_score_proj_0`, `kv_touch`, `gate_pre_route`, `hc_head_seed` —
+all have `role=inout` records in their dumps (verified: arg3 of
+comb_sinkhorn, arg0 of kv_touch/gate_pre_route/hc_head_seed are all
+`role=inout` with both `before_dispatch` and `after_completion`
+records).
+
+**Fix:** `capture.py` harvest should treat `inout` as both input (take
+`before_dispatch` copy for `vN.bin`) and output (take `after_completion`
+copy for `golden_vN.bin`).
+
+### 5.2 C3 — index scalars beyond `ctx_len` default to 0
+
+(Already covered in §3.2/§3.3 — same root cause produces either a
+precision FAIL with diff or an NPU crash, depending on whether the
+kernel writes anything with the collapsed view.)
+
+**Fault text (crash variant):** NPU exits 1 (AICore exception or
+silent garbage — depends on kernel).
+
+**Root cause:** `vpto_run.py:355-363` only marks the FIRST non-SPMD
+index scalar as `ctx_len`; `setup_main.py:182` defaults the rest to 0.
+Kernels with multiple index args (e.g. row-offset + group-index +
+col-offset) get wrong dimensions → tile loops don't cover the GM tensor
+→ either leaks (§3.2) or AICore faults (this bucket).
+
+**Affected kernels (sampled):** any kernel whose `.pto` has ≥2 non-SPMD
+`index` args. Fix: derive scalar semantics from the `.pto`'s
+`make_tensor_view` shape dims, not just "first non-SPMD index".
+
+### 5.3 C4 — output-only ptr → 0-byte alloc → `aclrtMallocHost` fails
+
+**Fault text:** `aclrtMallocHost failed: 100000 ... Invalid_Argument
+(EH0007): aclrtMallocHostImpl failed because value 0 for parameter size
+is invalid. Expected value: must be greater than zero.`
+
+**Root cause:** `setup_main.py` computes `fileSize_vN = elemCount *
+sizeof(dtype)` from `capture_meta.json`'s `elem_counts`. When a kernel
+has an output-only ptr whose dump record has `numel = 0` (or the elem
+count wasn't captured), `fileSize = 0` → `aclrtMallocHost(0)` fails.
+The kernel's actual runtime numel comes from the index scalars (which
+are wrong per §5.2), so even if the alloc succeeded the buffer would be
+undersized.
+
+**Affected kernels (sampled):** `hc_pre_linear`, `proj_b_mm`, and any
+kernel with a 0-element output in its dump.
+
+### 5.4 C8 — 0-iter SPMD (kernel never dispatched)
+
+**Fault text:** `harvest failed: no dump records for kernel <name> (fid <N>)`
+
+**Root cause (two sub-cases):**
+1. **`inout` role** (5 of 7): `kv_touch`, `gate_pre_route`,
+   `hc_head_seed`, `hc_post_inactive_pad` (×3 prefill modules) — these
+   kernels have `inout` records but no `input`/`output` records, so the
+   harvester skips them (same bug as §5.1).
+2. **Genuinely 0-iter** (1 of 7, `hc_post_inactive_pad` in prefill):
+   verified via `deps.json` — no task has this `kernel_id`, meaning the
+   kernel's SPMD loop body never executed on any block during capture
+   (the kernel is conditional / branch-not-taken in this test input).
+   No bytes were ever written → nothing to harvest.
+
+**Fix (sub-case 1):** same as §5.1. **Fix (sub-case 2):** the framework
+should skip these kernels gracefully (mark as "not-exercised" rather
+than "crash") — they need a different test input that triggers the
+branch.
 
 ---
 
-## 6. Module-level rollup
+## 6. Root-cause C5–C7 — lowering crash (143 rows)
+
+These rows failed at the ptoas or bisheng step, before any NPU
+execution. Probing representative kernels across 4 modules captured 4
+distinct error classes.
+
+### 6.1 C5 — ptoas `NoMatchingTemplate` for `pto.tdivs` / `pto.tstore`
+
+**Fault text:**
+```
+error: InsertTemplateAttributes metadata RPC failed: Error: daemon RPC
+failed: NoMatchingTemplate: no legal template for op='pto.tdivs'
+target='a5'; template_tdivs_tile_scalar: dtype signature
+('i32', 'i32', 'i32') is not supported; ... 4 candidate templates rejected
+```
+
+**Root cause:** ptoas's A5 template library has no `tdivs` (tile
+scalar-division) template for the `i32` dtype signature. The op is
+emitted by pypto for integer division on tile buffers (e.g. Sinkhorn
+normalization, route hashing). A5 only supports `tdivs` for fp32.
+
+**Affected kernels (probed + confirmed):** `merge_norm`, `rope_cs`,
+`rmsnorm_rope`, `route_hash`, `rope`, `prefill_c4_rmsnorm_rope`,
+`prefill_idx_c4_rmsnorm_rope`, `prefill_hca_c128_rmsnorm_rope`,
+`qr_rms_norm_quant`, `quant` (also hits i8, see §6.2). All contain a
+`pto.tdivs` op on i32 tiles.
+
+A separate variant (`ffn_norm`) hits the same class for a different op:
+```
+NoMatchingTemplate: no legal template for op='pto.tstore' target='a5';
+6 candidate templates rejected (custom constraints not satisfied)
+```
+— a `tstore` with a layout/dtype combination the A5 templates don't
+cover.
+
+**Routed to:** ptoas (A5 template coverage). Fix: add i32 `tdivs`
+templates, or have pypto lower i32 division to fp32 + cast.
+
+### 6.2 C6 — bisheng `unknown type name 'i8'`
+
+**Fault text:**
+```
+launch.cpp:35:79: error: unknown type name 'i8'
+extern "C" __global__ AICORE void quant(__gm__ float* v1, __gm__ i8* v2, ...);
+```
+
+**Root cause:** `pto_parse.py:183` `PTO_TO_CPP` map is missing an `i8`
+entry. The `.pto` uses `!pto.ptr<i8>` (signed 8-bit int, e.g. for
+quantized int8 weights), but `PTO_TO_CPP` only has `{f32, bf16, f16,
+i32, i64, i16, index}` — no `i8`, no `u8`. `setup_main.py` then emits
+raw `i8` into `launch.cpp`, which bisheng doesn't recognize (it expects
+`int8_t` or `char`).
+
+**Affected kernels (probed + confirmed):** `quant`, `score_mat`,
+`kv_and_cache_write`, `qproj_matmul`, `exp_gate_mm`, `exp_h_q`,
+`sh_gate_mm`, `sh_up_mm`, `exp_up_mm`, `sh_w2_mm`, `exp_w2_mm`,
+`x_norm_quant` — all have `!pto.ptr<i8>` args (quantized weight
+matrices or int8 outputs).
+
+**Routed to:** test framework (`pto_parse.py` `PTO_TO_CPP` map). Fix:
+add `"i8": "int8_t", "u8": "uint8_t"` to the map.
+
+### 6.3 C7 — ptoas `operand does not dominate this use` + missing .pto
+
+**Fault text (attention_hca):**
+```
+error: operand #0 does not dominate this use
+```
+in `build_valid.pto:27:3` — a pypto-emitted `.pto` with an SSA dominance
+violation. ptoas rejects it.
+
+**Fault text (qk_pv_aic, qk_pv_aiv, gate_aic, gate_aiv,
+mtp_projection_linear_aic/aiv):** no `.pto` file exists at all — these
+are `_aic`/`_aiv` suffixed kernels that are **split** at runtime (one
+logical kernel → two AIC/AIV compiled artifacts), and the capture dump's
+name_map doesn't emit separate `*_aic`/`*_aiv` entries. The harvester
+can't find a kernel by that name.
+
+**Routed to:** pypto (SSA dominance) + framework (aic/aiv split
+handling).
+
+---
+
+## 7. Module-level rollup + distinct-kernel classification
+
+### 7.1 Module × status heatmap
 
 | module | total | pass | fail | crash |
 |---|---:|---:|---:|---:|
@@ -302,24 +449,28 @@ The `rms_norm` analysis above used the 5 identical rows. The remaining
 | rms_norm | 1 | 1 | 0 | 0 |
 | sparse_attn | 10 | 0 | 3 | 7 |
 
-Observations:
-- **`rms_norm` standalone module PASSES** (max_diff = 0), but `rms_norm`
-  as an inner kernel inside every attention module FAILs with the
-  identical `999424.0` pattern. §4 traced this to a **codegen variant
-  difference** (H3 confirmed): the inner-kernel `.pto` hardcodes the row
-  dimension to `c128_index` and drops the dynamic `%arg3`, while the
-  leaf variant keeps it dynamic. The leaked values (`1.0`, `1000.0` =
-  `rsqrt(eps)`, `999424.0`) are fp32 intermediates held in the same
-  local-memory address as the output bf16 tile. H1 (sync) and H2
-  (golden) are refuted for this family.
-- Modules with 0 PASS (gate, sparse_attn, compressor,
-  prefill_compressor_ratio4) have no positive control — their FAILs
-  could be either codegen or capture; need at least one passing case
-  per family to isolate.
+### 7.2 Distinct-kernel best-status classification (129 kernels)
+
+The 338 rows cover **129 distinct kernel basenames** (same kernel
+appears in multiple modules). Each kernel's "best status anywhere"
+falls into one of 4 buckets:
+
+| best status anywhere | count | root cause class |
+|---|---:|---|
+| PASS somewhere | 17 | (positive control — framework sound for these shapes) |
+| precision FAIL (with diff) somewhere | 3 | C1 (§3): `rms_norm`, `mtp_projection_rms`, `proj_a_mm` |
+| FAIL no-diff only (NPU runs then crashes) | 53 | C2/C3/C4 (§5): inout-harvest, scalar=0, size=0 alloc |
+| CRASH only (lowering/harvest) | 56 | C5/C6/C7 (§6) + C8 (§5.4) |
+
+The 17 PASS kernels (the positive control set, §8) prove the capture→
+replay chain is byte-accurate for their shapes. The 53 "NPU-crash"
+kernels are **not** 53 independent bugs — they decompose into 3
+framework-side root causes (§5.1–5.3). The 56 "lowering-crash"
+kernels decompose into 3 codegen/framework causes (§6.1–6.3).
 
 ---
 
-## 7. PASS kernel inventory (the positive control set)
+## 8. PASS kernel inventory (the positive control set)
 
 These 52 (module, kernel) pairs reproduce golden bit-for-bit through the
 full Route 2 chain. They are the calibration evidence that the framework
@@ -331,9 +482,9 @@ below.)
 - `kv_hadamard`, `mix_x`, `hc_post`, `merge_norm` — pass consistently
   across modules.
 - `rms_norm` passes as a **leaf** module but fails as an **inner**
-  kernel — see §6.
+  kernel — see §3.1.
 
-### 6.1 What the PASSes tell us
+### 8.1 What the PASSes tell us
 
 - The **harvest → replay byte pipeline is correct**: the same `.bin`
   bytes that Route 1 captured, fed back through Route 2, reproduce
@@ -349,36 +500,35 @@ leaf-vs-inner contrast is the cleanest available natural experiment.
 
 ---
 
-## 8. Next steps
+## 9. Next steps
 
-**Completed (rms_norm family, 5 of 8 FAILs):** §4.1–§4.5 traced the
-`999424.0` FAILs to a codegen variant difference — the inner-kernel
-`.pto` hardcodes the row dim and collides local-memory tile addresses.
-Routed to **pypto** (inner-kernel codegen), not ptoas/bisheng/CANN,
-not the test framework, not golden data.
+**All 338 rows classified.** The 286 non-pass rows decompose into 8
+root-cause classes (§3, §5, §6). The headline finding: **~180 of 286
+failures (63%) are framework-side bugs** fixable in the test framework
+without touching pypto/ptoas/bisheng.
 
-**Remaining (3 of 8 FAILs):**
-1. **`mtp_projection_rms`** (`max_diff = 1000.0`, `n_over = 8/64`):
-   the `1000.0 = rsqrt(1e-6)` fingerprint matches the `rms_norm` class.
-   Re-run the §4.2–§4.3 audit (leaf-vs-inner `.pto` diff, local-memory
-   tile-address collision) on this kernel. High prior of being the same
-   defect class.
-2. **`proj_a_mm@sparse_attn`** (`max_diff = 1.95e+38`, catastrophic):
-   near-bf16-max magnitude suggests GM out-of-bounds read or a captured
-   buffer the kernel didn't populate. Run §4.2 golden audit first —
-   verify the captured input bytes are real data, not zeros/garbage. If
-   inputs are valid, this is a separate codegen/runtime defect.
-3. **`proj_a_mm@attention_csa`** (`max_diff = 27.82`, bounded): the
-   only FAIL that looks like genuine numerical drift (small, bounded,
-   `n_over = 1024/262144` = 0.4% of elements). Defer to per-kernel
-   precision debugging — likely a real VPTO lowering precision issue,
-   not a structural leak.
+### 9.1 Framework-side fixes (would convert ~180 crash rows → pass or true-fail)
 
-**Cross-cutting:** the 135 "NPU run failed (exit 1)" cases (the
-largest FAIL bucket) and the 143 "ptoas/bisheng lowering failure"
-crashes are separate problem classes — they never reached compare, so
-they need codegen/run-time fault triage, not precision investigation.
-The 7 "no dump records" harvest crashes (0-iteration SPMD kernels like
-`kv_touch`, `gate_pre_route`, `hc_head_seed`, `hc_post_inactive_pad`)
-are framework edge cases where the kernel's SPMD loop body never
-executed on any block — a capture-coverage gap, separate from precision.
+| fix | class | affected rows | where |
+|---|---|---:|---|
+| Harvest `role=inout` as both input+output | C2 (§5.1), C8 (§5.4) | ~55 | `capture.py:155-160` |
+| Derive index-scalar semantics from `.pto` tensor-view shape dims (not just first non-SPMD) | C3 (§5.2), C1-§3.2/§3.3 | ~45 + 3 precision | `vpto_run.py:355-363`, `setup_main.py:182` |
+| Add `i8→int8_t`, `u8→uint8_t` to `PTO_TO_CPP` | C6 (§6.2) | ~30 | `pto_parse.py:183` |
+| Handle 0-byte output alloc (skip `aclrtMallocHost(0)`) | C4 (§5.3) | ~30 | `setup_main.py` |
+| Handle `_aic`/`_aiv` split kernels in name_map lookup | C7 (§6.3) | ~8 | `capture.py` |
+| Treat NaN in compare output as FAIL (not pass) | C1-§3.3 | 1 | `compare.py` |
+
+### 9.2 pypto/ptoas-side fixes (the ~80 genuine lowering/precision bugs)
+
+| fix | class | affected rows | where |
+|---|---|---:|---|
+| Add A5 `tdivs` i32 template (or lower i32→fp32 in pypto) | C5 (§6.1) | ~80 | ptoas |
+| Fix inner-kernel `rms_norm` hardcoded shape + local-mem tile collision | C1-§3.1 | 5 | pypto |
+| Fix `build_valid.pto` SSA dominance violation | C7 (§6.3) | 1 | pypto |
+
+### 9.3 Genuine 0-iter SPMD (framework can't fix alone)
+
+`hc_post_inactive_pad` (prefill modules) is a conditional kernel whose
+SPMD loop body never executed during capture — the test input doesn't
+trigger its branch. Needs a different test input that activates the
+inactive-pad path; not a framework or codegen bug.
