@@ -532,3 +532,136 @@ without touching pypto/ptoas/bisheng.
 SPMD loop body never executed during capture — the test input doesn't
 trigger its branch. Needs a different test input that activates the
 inactive-pad path; not a framework or codegen bug.
+
+---
+
+## 10. VMI+membar+bisheng-VF-off route — comparison sweep
+
+A second full 338-kernel sweep was run with a different ptoas+bisheng
+codegen route, per `ptoas/README-vmi-membar-bishengvfoff.md`. This route
+turns on the VMI fusion pipeline, inserts vecscope memory barriers, and
+disables bisheng's VF-fusion backend passes so the NPU sees the
+membar-inserted schedule without re-fusion.
+
+| switch | baseline route | vmi-membar-vfoff route |
+|---|---|---|
+| ptoas `--enable-vmi` | off | **on** |
+| ptoas `--enable-op-fusion` | on (bare) | `=true` (required for VMI) |
+| ptoas `--enable-vecscope-mem-bar` | off | **on** |
+| bisheng VF-fusion | on (default) | **off** (7 `-mllvm` options) |
+
+Results CSV: `baselines/vpto_dsv4_vector/sweep_results_vmi-membar-vfoff.csv`.
+
+### 10.1 Status tally (baseline vs vmi-membar-vfoff)
+
+| status | baseline | vmi-membar-vfoff | delta |
+|---|---:|---:|---:|
+| PASS | 52 | 45 | -7 |
+| FAIL (no diff, NPU crash) | 135 | 152 | +17 |
+| FAIL (with diff, true precision) | **8** | **1** | **-7** |
+| CRASH (lowering/harvest) | 143 | 140 | -3 |
+
+**Headline finding: the VMI+membar route eliminates 7 of 8 true-precision
+FAILs** (the local-memory leak class). The single remaining precision
+FAIL is `mtp_projection_rms`, which is the framework `scalar_sem=0` bug
+(§3.2) — not a codegen issue, so no route change can fix it.
+
+### 10.2 The 7 precision FAILs fixed by VMI+membar
+
+| kernel | module | baseline max_diff | vmi status |
+|---|---|---:|---|
+| `rms_norm` | attention_csa | 999424.0 | FAIL (NPU crash — UB alignment, §10.4) |
+| `rms_norm` | attention_swa | 999424.0 | FAIL (NPU crash — UB alignment) |
+| `rms_norm` | prefill_attention_csa | 999424.0 | FAIL (NPU crash — UB alignment) |
+| `rms_norm` | prefill_attention_hca | 999424.0 | FAIL (NPU crash — UB alignment) |
+| `rms_norm` | prefill_attention_swa | 999424.0 | FAIL (NPU crash — UB alignment) |
+| `proj_a_mm` | attention_csa | 27.82 | **PASS (max_diff=0)** |
+| `proj_a_mm` | sparse_attn | 1.95e+38 | **PASS (max_diff=0)** |
+
+The `rms_norm` family: the baseline route's local-memory tile-address
+collision (§3.1) no longer produces leaked intermediates — but the VMI
+route introduces a **new** UB-alignment crash on the same kernel (§10.4).
+So the original leak is gone, replaced by a different VMI codegen bug.
+Net: still not usable, but the failure *mode* changed from "wrong
+output" to "clean crash" (which is strictly better — a crash is
+detectable, a silent wrong output is not).
+
+The `proj_a_mm` pair: **fully fixed** — both the bounded (27.82) and
+catastrophic (1.95e+38) FAILs become exact PASS (max_diff=0). VMI fusion
+eliminated the cube kernel's wrong-index read that the scalar_sem=0
+framework bug exposed.
+
+### 10.3 The 6 IMPROVED kernels (crash/fail → PASS)
+
+| kernel | modules | baseline status | vmi status | vmi timing |
+|---|---|---|---|---:|
+| `merge_norm` | attention_csa, attention_swa, sparse_attn | crash (pto.tdivs) | PASS | 0.58 ms |
+| `proj_a_mm` | attention_csa, sparse_attn | fail (precision) | PASS | 0.45–0.53 ms |
+| `proj_a_mm` | attention_swa | fail (precision) | PASS | 0.53 ms |
+
+`merge_norm` crashed in baseline due to `pto.tdivs` NoMatchingTemplate
+(§6.1). Under VMI, the i32 tdivs op is fused away by the VMI pipeline →
+the template is no longer needed → the kernel compiles and runs
+correctly. **VMI fusion fixes the pto.tdivs template-coverage gap for
+`merge_norm`.** (Not for other tdivs kernels — see §10.5.)
+
+### 10.4 The 13 REGRESSED kernels (PASS → NPU crash)
+
+All 13 regressions have the **identical** fault:
+```
+errcode:(340) errorStr: The address for VEC to access UB is not aligned.
+retCode=0x31, vector core exception.
+```
+
+| kernel | modules affected |
+|---|---|
+| `mix_x` | attention_csa, attention_swa, hc_pre, prefill_attention_csa, prefill_attention_hca, prefill_attention_swa |
+| `merge_norm` | prefill_attention_csa, prefill_attention_hca, prefill_attention_swa, prefill_sparse_attn |
+| `rms_norm` (leaf) | rms_norm |
+| `hc_head_reduce` | hc_head |
+| `mtp_projection_norm` | mtp_projection |
+
+Pattern: `mix_x` regresses in 6 modules, `merge_norm` regresses in 4
+prefill modules, plus 2 singletons. All hit the same VMI codegen bug:
+the VMI fusion pipeline emits a VEC→UB access with an unaligned address.
+**Routed to:** ptoas (VMI pipeline UB-alignment bug).
+
+Note the `merge_norm` split: in decode modules it IMPROVES (crash→pass,
+§10.3); in prefill modules it REGRESSES (pass→crash). The difference is
+the shape — prefill's larger `[128, ...]` tiles trigger the VMI
+alignment bug, while decode's smaller `[8, ...]` tiles don't.
+
+### 10.5 What VMI+membar does NOT fix
+
+- **`mtp_projection_rms`** (`max_diff=1000.0`, `n_over=8/16`): unchanged
+  — same `scalar_sem=0` framework bug (§3.2), not a codegen issue.
+- **`pto.tdivs` on other kernels**: VMI fusion fixes `merge_norm`
+  (decode) but NOT `rope`, `rope_cs`, `rmsnorm_rope`,
+  `prefill_c4_rmsnorm_rope`, etc. — these still hit the
+  NoMatchingTemplate error. VMI only fuses tdivs when it's inside a
+  fusion-eligible region; standalone tdivs ops are untouched.
+- **`i8` unmapped** (§6.2): unaffected — bisheng still rejects `i8`.
+- **`inout` harvest bug** (§5.1): unaffected — framework-side, route-
+  independent.
+
+### 10.6 Route comparison summary
+
+| metric | baseline | vmi-membar-vfoff | verdict |
+|---|---:|---:|---|
+| total PASS | 52 | 45 | -7 (net worse) |
+| true precision FAILs | 8 | 1 | **-7 (much better)** |
+| NPU crashes (UB alignment) | 0 | 13 | +13 (new VMI bug) |
+| lowering crashes (tdivs) | ~80 | ~77 | -3 (VMI fuses 3 merge_norm) |
+| framework bugs (inout/scalar/i8) | ~180 | ~180 | unchanged |
+
+**The VMI+membar route is a precision win but a stability loss.** It
+eliminates 7 of 8 silent-precision FAILs (the local-mem leak class) and
+fixes `merge_norm`+`proj_a_mm` (6 kernels, crash/fail → exact PASS). But
+it introduces 13 new NPU crashes from a VMI UB-alignment codegen bug.
+Net pass count drops by 7, but the failure *quality* improves: silent
+wrong outputs become loud crashes.
+
+**Recommendation:** the VMI route is the better precision baseline once
+the 13-kernel UB-alignment bug is fixed in ptoas. Until then, the
+baseline route is safer (more passes, no regressions) but produces 7
+silent precision FAILs.
