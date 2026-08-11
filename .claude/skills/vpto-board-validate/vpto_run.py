@@ -218,6 +218,29 @@ def _write_result_sidecar(path: Path, *, kernel: str, mode: str, device: int,
     path.write_text(json.dumps(result, indent=2), encoding="utf-8")
 
 
+def _ctx_len_from_config(model_py: Path, mode: str) -> int:
+    """Read B*S from the model's config.py (ctx_len for the trailing index
+    scalar). Used in --captured-dump mode where resolve_meta is skipped."""
+    import subprocess
+    b = "DECODE_BATCH" if mode == "decode" else "PREFILL_BATCH"
+    s = "DECODE_SEQ" if mode == "decode" else "PREFILL_SEQ"
+    cfg = model_py.parent / "config.py"
+    code = (
+        "import importlib.util\n"
+        f"spec = importlib.util.spec_from_file_location('cfg', {str(cfg.absolute())!r})\n"
+        "cfg = importlib.util.module_from_spec(spec); spec.loader.exec_module(cfg)\n"
+        f"print(getattr(cfg, {b!r}) * getattr(cfg, {s!r}))\n"
+    )
+    r = subprocess.run(
+        [str(run_jit_golden._venv_python()), "-c", code],
+        capture_output=True, text=True, timeout=30)
+    if r.returncode != 0:
+        print(f"[vpto_run] WARN: ctx_len from config failed: {r.stderr[-200:]}",
+              file=sys.stderr)
+        return 8  # fallback
+    return int(r.stdout.strip().splitlines()[-1])
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="VPTO board-validation executor")
     ap.add_argument("--pto", required=True, type=Path)
@@ -235,6 +258,12 @@ def main() -> int:
     ap.add_argument("--kernel", default=None, help="kernel name (default: .pto stem)")
     ap.add_argument("--device", type=int, default=0)
     ap.add_argument("--build-dir", type=Path, default=None)
+    ap.add_argument("--captured-dump", type=Path, default=None,
+                    help="Phase 5: a run_dir already containing vN.bin / "
+                         "golden_vN.bin + capture_meta.json (from capture.py). "
+                         "Skips resolve_meta + dump_bins; uses the captured "
+                         "buffers directly. For non-leaf inner kernels whose "
+                         "ptrs are intermediates from a preceding kernel.")
     ap.add_argument("--keep", action="store_true", help="keep the run dir (default: build_output)")
     args = ap.parse_args()
 
@@ -304,7 +333,38 @@ def main() -> int:
     kind = setup_vpto.detect_kernel_kind(pto_text)
 
     use_model_py = args.model_py is not None
-    if use_model_py:
+    use_captured = args.captured_dump is not None
+    if use_captured:
+        # Phase 5: non-leaf inner kernel. The golden buffers were captured
+        # from a Route-1 run of the owning module (capture.py) and written
+        # into args.captured_dump as vN.bin / golden_vN.bin + capture_meta.json.
+        # Skip resolve_meta (which would fail: no ptr->spec map for non-leaf).
+        import json as _json
+        meta_path = args.captured_dump / "capture_meta.json"
+        if not meta_path.exists():
+            print(f"[vpto_run] ERROR: {meta_path} not found "
+                  f"(--captured-dump needs a capture.py run_dir)", file=sys.stderr)
+            return 2
+        cmeta = _json.loads(meta_path.read_text(encoding="utf-8"))
+        outputs = cmeta["outputs"]
+        consts = {}
+        scalar_sem = []
+        ctx_marked = False
+        # ctx_len still needed for the trailing index scalar; read from config.
+        ctx_len = _ctx_len_from_config(args.model_py, args.mode) if args.model_py else 8
+        for p in info["params"]:
+            if p["pto_type"] in ("i32", "index"):
+                sig = p.get("sig_name", "") or p["name"]
+                if not ctx_marked and "spmd" not in sig:
+                    scalar_sem.append("ctx_len")
+                    ctx_marked = True
+                else:
+                    scalar_sem.append(None)
+        load_vals = {"ctx_len": ctx_len, "ctx_blocks": None}
+        golden_np_types = cmeta["np_types"]
+        # elem_counts_override: captured numel per vN (from the dump shapes)
+        elem_counts_override = cmeta["elem_counts"]
+    elif use_model_py:
         # Mode B: DSV4 run_jit-style. The golden metadata (which specs are
         # outputs, ctx_len = B*S, np_types, elem_counts) comes from importing
         # the model. Resolve BEFORE main.cpp (needs outputs + elem_counts).
@@ -329,6 +389,7 @@ def main() -> int:
         load_vals = {"ctx_len": model_meta["ctx_len"],
                      "ctx_blocks": model_meta.get("ctx_blocks")}
         golden_np_types = model_meta["np_types"]
+        elem_counts_override = model_meta.get("elem_counts")
     else:
         outputs = get_outputs_from_golden_lib(args.golden_lib.parent, kernel) or []
         consts = get_golden_constants(args.golden_lib.parent) or {}
@@ -336,13 +397,21 @@ def main() -> int:
         load_vals = {"ctx_len": consts.get("MAX_SEQ"),
                      "ctx_blocks": consts.get("MAX_CTX_BLOCKS")}
         golden_np_types = None
+        elem_counts_override = None
     print(f"[vpto_run] kernel={kernel} kind={kind} params="
           f"{[(p['name'], p['pto_type']) for p in info['params']]} "
           f"outputs={outputs} elem_counts={info.get('elem_counts', {})} "
-          f"golden_mode={'model-py' if use_model_py else 'golden-lib'}")
+          f"golden_mode={'captured' if use_captured else 'model-py' if use_model_py else 'golden-lib'}")
 
     # --- 1. write golden.py stub + compare.py + validation_runtime.py into run_dir ---
-    if use_model_py:
+    if use_captured:
+        # Phase 5: vN.bin / golden_vN.bin already in run_dir (from capture.py).
+        # Copy them in if captured_dump != run_dir, else they're already here.
+        if args.captured_dump.resolve() != run_dir.resolve():
+            for src in args.captured_dump.glob("*.bin"):
+                shutil.copy(src, run_dir / src.name)
+        # no gen_golden.py stub — bins are pre-existing.
+    elif use_model_py:
         # Mode B: stub calls run_jit_golden.dump_bins, which imports the model
         # under the repo venv + golden package, runs golden_fn, dumps *.bin.
         # Metadata was already resolved above; this step just materializes bins.
@@ -382,7 +451,6 @@ if __name__ == "__main__":
     (run_dir / "outputs.txt").write_text("\n".join(outputs) + "\n", encoding="utf-8")
 
     # --- 2. write main.cpp + launch.cpp ---
-    elem_counts_override = model_meta.get("elem_counts") if use_model_py else None
     main_cpp = setup_main.gen_main_cpp(
         info, outputs,
         load_vals=load_vals,
@@ -457,7 +525,10 @@ if __name__ == "__main__":
 
     # --- 6. golden ---
     golden_env = dict(cann_env)
-    if use_model_py:
+    if use_captured:
+        # Phase 5: bins already in run_dir (copied in step 1). No gen_golden.py.
+        print("[vpto_run] golden: using captured bins (skipping gen_golden.py)")
+    elif use_model_py:
         # Mode B: needs torch + golden package → run under the repo venv.
         venv_py = run_jit_golden._venv_python()
         golden_env["PYTHONPATH"] = (

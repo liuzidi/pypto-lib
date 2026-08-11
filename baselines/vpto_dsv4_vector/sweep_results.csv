@@ -1,3 +1,49 @@
 kernel,module,route,mode,device,pass,compare_status,exit_code,max_diff,n_over,n_total,threshold,timing_ms,rtol,atol,fatobj_bytes,has_kernel_sym,has_ctor,nested_elf_offsets,error
-hc_post,hc_post,vpto,decode,0,False,fail,1,0.372909,26519,229376,0.00686481,0.626,0.005,0.005,6968,True,True,"[0, 288]",
-rms_norm,rms_norm,vpto,decode,0,False,fail,1,3.38953e+38,56974,57344,0.0279687,0.606,0.005,0.005,8712,True,True,"[0, 288]",
+comb_sinkhorn,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,9496,True,True,"[0, 312]",NPU run failed (exit 1)
+csa_cache_writeback,attention_csa,vpto(phase5),decode,0,True,pass,0,0.0,,,0.005,0.535,0.005,0.005,5448,True,True,"[0, 288]",
+csa_cmp_rope,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,5688,True,True,"[0, 280]",NPU run failed (exit 1)
+csa_rope_step,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,7176,True,True,"[0, 280]",NPU run failed (exit 1)
+csa_slots_build_valid_qk_plan,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,14120,True,True,"[0, 296]",NPU run failed (exit 1)
+hc_post,attention_csa,vpto(phase5),decode,0,True,pass,0,0.0,,,0.005,0.719,0.005,0.005,6968,True,True,"[0, 288]",
+hc_pre_linear,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,5920,True,True,"[0, 296]",NPU run failed (exit 1)
+hc_pre_rms,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,7608,True,True,"[0, 288]",NPU run failed (exit 1)
+hc_pre_seed,attention_csa,vpto(phase5),decode,0,True,pass,0,0.0,,,0.005,0.65,0.005,0.005,5096,True,True,"[0, 264]",
+idx_qr_proj_dequant,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,5968,True,True,"[0, 304]",NPU run failed (exit 1)
+idx_qr_proj_matmul,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+kv_and_cache_write,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+kv_hadamard,attention_csa,vpto(phase5),decode,0,True,pass,0,0.0,,,0.005,0.52,0.005,0.005,4728,True,True,"[0, 264]",
+kv_proj_matmul,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,6088,True,True,"[0, 296]",NPU run failed (exit 1)
+kv_proj_seed,attention_csa,vpto(phase5),decode,0,True,pass,0,0.0,,,0.005,0.724,0.005,0.005,4968,True,True,"[0, 248]",
+kv_rms_norm_rope,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+kv_score_proj,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,6024,True,True,"[0, 296]",NPU run failed (exit 1)
+kv_score_proj_0,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,5768,True,True,"[0, 296]",NPU run failed (exit 1)
+kv_touch,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,harvest failed: no dump records for kernel kv_touch (fid 37)
+merge_norm,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+mix_x,attention_csa,vpto(phase5),decode,0,True,pass,0,0.0,,,0.005,0.551,0.005,0.005,7280,True,True,"[0, 288]",
+proj_a_mm,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,0.482,0.005,0.005,6008,True,True,"[0, 288]",
+proj_b_act,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,6072,True,True,"[0, 288]",NPU run failed (exit 1)
+proj_b_mm,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+q_rope_prepare,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+qk_pv_aic,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+qk_pv_aiv,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+qproj_dequant_rms_nope_rope,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+qproj_matmul,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+qr_hadamard_matmul,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,4960,True,True,"[0, 280]",NPU run failed (exit 1)
+qr_hadamard_quant,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+qr_proj_matmul,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,6040,True,True,"[0, 296]",NPU run failed (exit 1)
+qr_proj_seed,attention_csa,vpto(phase5),decode,0,True,pass,0,0.0,,,0.005,0.521,0.005,0.005,4968,True,True,"[0, 248]",
+qr_rms_norm_quant,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+qr_rope,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+quant,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+rms_norm,attention_csa,vpto(phase5),decode,0,False,fail,1,999424.0,7,57344,0.005,0.602,0.005,0.005,8568,True,True,"[0, 272]",
+rmsnorm_rope,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+rmsnorm_rope_cache_write,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+rope_cs,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+scatter_softmax_pool,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,8800,True,True,"[0, 288]",NPU run failed (exit 1)
+scatter_softmax_pool_0,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,10072,True,True,"[0, 288]",NPU run failed (exit 1)
+score_mat,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+score_reduce,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,8352,True,True,"[0, 312]",NPU run failed (exit 1)
+split_pre_post,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,6672,True,True,"[0, 312]",NPU run failed (exit 1)
+topk,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,6688,True,True,"[0, 288]",NPU run failed (exit 1)
+weights_proj,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,5184,True,True,"[0, 280]",NPU run failed (exit 1)
+weights_proj_reduce,attention_csa,vpto(phase5),decode,0,False,fail,1,,,,,,0.005,0.005,5616,True,True,"[0, 256]",NPU run failed (exit 1)

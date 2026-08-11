@@ -31,6 +31,7 @@ Usage:
 import argparse
 import csv
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -142,6 +143,186 @@ def _error_row(row: dict, mode: str, device: int, error: str) -> dict:
     return out
 
 
+def run_phase5_module(module: str, model_py: Path, mode: str, device: int) -> list:
+    """Phase 5: capture one module's intermediate GM buffers (Route 1 run with
+    enable_dump_args=2), then replay each inner kernel on Route 2 (VPTO) using
+    the captured buffers and compare.
+
+    Returns a list of result rows (schema = RESULT_FIELDS). Crashes (ptoas
+    lowering, bisheng link, NPU run) are recorded as findings and the sweep
+    continues — never aborts.
+    """
+    import json
+    # locate capture.py + the skill
+    capture_py = REPO_ROOT / "tests" / "dsv4_validate" / "capture.py"
+    vpto_run = (REPO_ROOT / ".claude" / "skills" /
+                "vpto-board-validate" / "vpto_run.py")
+    venv_py = REPO_ROOT / ".venv" / "bin" / "python3"
+
+    # Step 1: run the module once with full args dump (Route 1 capture).
+    # The dump work_dir carries ptoas/*.pto + dfx_outputs/{args_dump,name_map}.
+    dump_wd = (REPO_ROOT / "build_output" / f"phase5_dump_{model_py.stem}")
+    sys.path.insert(0, str(REPO_ROOT / "tests" / "dsv4_validate"))
+    import capture as _capture
+    if not (dump_wd / "dfx_outputs" / "args_dump" / "args_dump.json").exists():
+        print(f"[validate] [phase5] running module {module} with dump...",
+              flush=True)
+        mod = _capture._load_module(model_py)
+        # set the PTOAS_ROOT env so pypto can find ptoas for compilation
+        env = dict(os.environ)
+        env["PTOAS_ROOT"] = "/data/liuzidi/PTOAS/build311/tools/ptoas"
+        old_environ = os.environ
+        os.environ.clear(); os.environ.update(env)
+        try:
+            entry = _DSV4_MODULE_TO_JIT_ENTRY.get(module)
+            dump_wd = _capture._run_module_with_dump(
+                mod, model_py, mode, device, dump_wd, jit_entry=entry)
+        except Exception as e:  # noqa: BLE001
+            os.environ.clear(); os.environ.update(old_environ)
+            return [_phase5_error_row(module, model_py, mode, device,
+                                      f"capture (run_jit) failed: {e}")]
+        os.environ.clear(); os.environ.update(old_environ)
+    print(f"[validate] [phase5] dump at {dump_wd}", flush=True)
+
+    # Step 2: read name_map to get the kernel list (callable_id -> name).
+    nm_glob = list((dump_wd / "dfx_outputs").glob("name_map_*.json"))
+    if not nm_glob:
+        return [_phase5_error_row(module, model_py, mode, device,
+                                  "no name_map_*.json in dump")]
+    name_map = json.loads(nm_glob[0].read_text(encoding="utf-8"))
+    cid2name = name_map["callable_id_to_name"]
+    # dedupe kernel names (a kernel may have multiple task instances)
+    kernel_names = sorted(set(cid2name.values()))
+    # map kernel name -> .pto file (basename usually matches, but not always;
+    # e.g. qk_pv_aic/qk_pv_aiv share qk_pv.pto). Try exact, then prefix.
+    ptoas_dir = dump_wd / "ptoas"
+    if not ptoas_dir.is_dir():
+        ptoas_dir = dump_wd / "kernels"  # fallback (older layout)
+    pto_files = {p.stem: p for p in ptoas_dir.glob("*.pto")}
+    print(f"[validate] [phase5] {len(kernel_names)} distinct kernels in "
+          f"name_map; {len(pto_files)} .pto files", flush=True)
+
+    results = []
+    for kname in kernel_names:
+        pto = pto_files.get(kname)
+        if pto is None:
+            # prefix match (qk_pv_aic -> qk_pv.pto); take the longest stem
+            # that is a prefix of kname to avoid false short-prefix matches.
+            cands = [(s, p) for s, p in pto_files.items() if kname.startswith(s)]
+            if not cands:
+                results.append(_phase5_error_row(
+                    module, model_py, mode, device, kname,
+                    f"no .pto for kernel {kname!r} in {ptoas_dir}"))
+                continue
+            cands.sort(key=lambda sp: -len(sp[0]))
+            pto = cands[0][1]
+        print(f"\n[validate] [phase5] === {kname} ({pto.name}) ===", flush=True)
+        # harvest this kernel's buffers into a fresh run_dir
+        run_dir = REPO_ROOT / "build_output" / f"vpto_{kname}" / "run"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        # clear stale bins
+        for old in run_dir.glob("*.bin"):
+            old.unlink()
+        if (run_dir / "capture_meta.json").exists():
+            (run_dir / "capture_meta.json").unlink()
+        try:
+            meta = _capture.harvest_kernel(dump_wd, dump_wd, kname, run_dir, pto)
+            (run_dir / "capture_meta.json").write_text(
+                json.dumps(meta, indent=2), encoding="utf-8")
+        except Exception as e:  # noqa: BLE001
+            results.append(_phase5_error_row(
+                module, model_py, mode, device, kname,
+                f"harvest failed: {e}"))
+            continue
+        # replay via vpto_run.py --captured-dump
+        cmd = [
+            "bash", "-c",
+            f"source {VPTO_ENV_SH} && exec {venv_py} {vpto_run} "
+            f"--pto {pto} --model-py {model_py} --mode {mode} "
+            f"--device {device} --kernel {kname} "
+            f"--captured-dump {run_dir}"]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True,
+                               cwd=str(REPO_ROOT))
+        except Exception as e:  # noqa: BLE001
+            results.append(_phase5_error_row(
+                module, model_py, mode, device, kname,
+                f"subprocess failed: {e}"))
+            continue
+        if r.stdout:
+            print(r.stdout.rstrip()[-1000:])
+        result_json = run_dir / "result.json"
+        if not result_json.exists():
+            results.append(_phase5_error_row(
+                module, model_py, mode, device, kname,
+                f"vpto_run exited {r.returncode} without result.json "
+                f"(likely ptoas/bisheng lowering failure)"))
+            continue
+        try:
+            res = json.loads(result_json.read_text(encoding="utf-8"))
+        except Exception as e:  # noqa: BLE001
+            results.append(_phase5_error_row(
+                module, model_py, mode, device, kname,
+                f"result.json parse failed: {e}"))
+            continue
+        out = {f: res.get(f, "") if not isinstance(res.get(f), bool)
+               else res.get(f) for f in RESULT_FIELDS}
+        out["kernel"] = kname
+        out["module"] = module
+        out["route"] = "vpto(phase5)"
+        out["mode"] = mode
+        out["device"] = device
+        results.append(out)
+        status = "PASS" if out.get("pass") else "FAIL"
+        md = out.get("max_diff", "")
+        print(f"[validate] [phase5] {kname}: {status}"
+              f"{f' max_diff={md}' if md not in ('', None) else ''}",
+              flush=True)
+    return results
+
+
+def _phase5_error_row(module: str, model_py: Path, mode: str, device: int,
+                      kernel: str, error: str) -> dict:
+    out = {f: "" for f in RESULT_FIELDS}
+    out.update({
+        "kernel": kernel, "module": module, "route": "vpto(phase5)",
+        "mode": mode, "device": device, "pass": False,
+        "compare_status": "crash", "exit_code": -1, "error": error,
+    })
+    return out
+
+
+# DSV4 module -> model .py mapping (the _jit_<mod>_test_* dir name).
+_DSV4_MODULE_TO_PY = {
+    "attention_csa": "decode_attention_csa.py",
+    "attention_hca": "decode_attention_hca.py",
+    "attention_swa": "decode_attention_swa.py",
+    "compressor": "decode_compressor_ratio4.py",
+    "indexer": "decode_indexer.py",
+    "indexer_compressor": "decode_indexer_compressor.py",
+    "sparse_attn": "decode_sparse_attn.py",
+    "gate": "gate.py", "hc_head": "hc_head.py", "hc_post": "hc_post.py",
+    "hc_pre": "hc_pre.py", "mtp_projection": "mtp_projection.py",
+    "qkv_proj_rope": "qkv_proj_rope.py", "rms_norm": "rmsnorm.py",
+    "expert_routed": "expert_routed.py", "expert_shared": "expert_shared.py",
+}
+
+# DSV4 module -> the @pl.jit entry fn name (when it differs from <stem>_test).
+_DSV4_MODULE_TO_JIT_ENTRY = {
+    "attention_csa": "attention_csa_test",
+    "attention_hca": "attention_hca_test",
+    "attention_swa": "attention_swa_test",
+    "compressor": "compressor_test",
+    "indexer": "indexer_test",
+    "indexer_compressor": "indexer_compressor_test",
+    "sparse_attn": "sparse_attn_test",
+    "gate": "gate_test", "hc_head": "hc_head_test", "hc_post": "hc_post_test",
+    "hc_pre": "hc_pre_test", "mtp_projection": "mtp_projection_test",
+    "qkv_proj_rope": "qkv_proj_rope_test", "rms_norm": "rms_norm_test",
+    "expert_routed": "expert_routed_test", "expert_shared": "expert_shared_test",
+}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="DSV4 VPTO sweep: run all runnable VPTO kernels on A5 "
@@ -153,39 +334,64 @@ def main() -> int:
                     help="NPU device id. Single card, serial. Default: 0.")
     ap.add_argument("--mode", default="decode", choices=["decode", "prefill"],
                     help="batch-shape contract to use. Default: decode.")
+    ap.add_argument("--module", default=None,
+                    help="Phase 5: sweep ALL inner kernels of one module "
+                         "(capture once via Route 1, replay each on Route 2). "
+                         "e.g. --module attention_csa. When set, the leaf "
+                         "sweep is skipped.")
     args = ap.parse_args()
 
-    if not CLASSIFICATION_CSV.exists():
-        print(f"[validate] ERROR: {CLASSIFICATION_CSV} not found. "
-              f"Run the classification generator first.", file=sys.stderr)
-        return 2
     if not VPTO_ENV_SH.exists():
         print(f"[validate] ERROR: {VPTO_ENV_SH} not found.", file=sys.stderr)
         return 2
 
-    leaves = load_strict_leaves(CLASSIFICATION_CSV, args.mode)
-    print(f"[validate] platform={args.platform} device={args.device} "
-          f"mode={args.mode}")
-    print(f"[validate] {len(leaves)} strict-leaf kernel(s) to sweep "
-          f"(non-leaf kernels skipped — Phase 5 deferred)")
-
-    results = []
-    for i, row in enumerate(leaves, 1):
-        print(f"\n[validate] === [{i}/{len(leaves)}] {row['kernel']} "
-              f"(module={row.get('module','')}) ===", flush=True)
-        res = run_one_leaf(row, args.mode, args.device)
-        results.append(res)
-        status = "PASS" if res.get("pass") else "FAIL"
-        md = res.get("max_diff", "")
-        t = res.get("timing_ms", "")
-        parts = [f"[validate] {res['kernel']}: {status}"]
-        if md not in ("", None):
-            parts.append(f"max_diff={md}")
-        if t not in ("", None):
-            parts.append(f"timing={t}ms")
-        if res.get("error"):
-            parts.append(f"err={res['error'][:80]}")
-        print(" ".join(parts), flush=True)
+    # --- Phase 5: module inner-kernel sweep (capture + replay) ---
+    if args.module is not None:
+        mod = args.module
+        mod_py_name = _DSV4_MODULE_TO_PY.get(mod, f"{mod}.py")
+        model_py = REPO_ROOT / "models" / "deepseek_v4_pro" / mod_py_name
+        if not model_py.exists():
+            # try prefill_/decode_ prefixes
+            for pfx in ("decode_", "prefill_"):
+                cand = REPO_ROOT / "models" / "deepseek_v4_pro" / f"{pfx}{mod_py_name}"
+                if cand.exists():
+                    model_py = cand
+                    break
+        if not model_py.exists():
+            print(f"[validate] ERROR: no model .py for module {mod!r} "
+                  f"(tried {mod_py_name})", file=sys.stderr)
+            return 2
+        print(f"[validate] [phase5] module={mod} model={model_py.name} "
+              f"device={args.device} mode={args.mode}")
+        results = run_phase5_module(mod, model_py, args.mode, args.device)
+    else:
+        # --- leaf sweep (Route 2 Mode B, no capture needed) ---
+        if not CLASSIFICATION_CSV.exists():
+            print(f"[validate] ERROR: {CLASSIFICATION_CSV} not found. "
+                  f"Run the classification generator first.", file=sys.stderr)
+            return 2
+        leaves = load_strict_leaves(CLASSIFICATION_CSV, args.mode)
+        print(f"[validate] platform={args.platform} device={args.device} "
+              f"mode={args.mode}")
+        print(f"[validate] {len(leaves)} strict-leaf kernel(s) to sweep "
+              f"(non-leaf kernels skipped — Phase 5 deferred)")
+        results = []
+        for i, row in enumerate(leaves, 1):
+            print(f"\n[validate] === [{i}/{len(leaves)}] {row['kernel']} "
+                  f"(module={row.get('module','')}) ===", flush=True)
+            res = run_one_leaf(row, args.mode, args.device)
+            results.append(res)
+            status = "PASS" if res.get("pass") else "FAIL"
+            md = res.get("max_diff", "")
+            t = res.get("timing_ms", "")
+            parts = [f"[validate] {res['kernel']}: {status}"]
+            if md not in ("", None):
+                parts.append(f"max_diff={md}")
+            if t not in ("", None):
+                parts.append(f"timing={t}ms")
+            if res.get("error"):
+                parts.append(f"err={res['error'][:80]}")
+            print(" ".join(parts), flush=True)
 
     # write aggregated CSV
     SWEEP_RESULTS_CSV.parent.mkdir(parents=True, exist_ok=True)
