@@ -96,7 +96,7 @@ export PTOAS_ROOT=$(dirname $PTOAS_BIN)
 | **测试框架** | C2/C3/C4/C6/C8 | ~180 | crash→pass 或 crash→真精度 FAIL |
 | **pypto/ptoas** | C1/C5/C7 + VMI UB | ~106 | 需要在编译器侧修 |
 
-> **当前状态**：框架侧 C2/C3/C6/C7b/C8b 已修，仅剩 C4。pypto 侧剩
+> **当前状态**：框架侧 C2/C3/C4/C6/C7b/C8b 全部修完。pypto 侧剩
 > C1a/C7a，ptoas 侧剩 VMI-UB（C5 已在 ptoas 源树修完）。
 > 注：C7 实际跨两层——C7a（SSA dominance）在 pypto，C7b（aic/aiv split
 > 按 func 锚定）在框架已修。
@@ -324,28 +324,44 @@ grep "int64_t v\|FIXME" build_output/vpto_mtp_projection_rms/run/main.cpp
 ### 根因
 
 **文件**：
-- `.claude/skills/vpto-board-validate/vpto_run.py:407-413`（scalar_sem 推导，
+- `.claude/skills/vpto-board-validate/vpto_run.py`（scalar_sem 推导，
   只标第一个非 SPMD index 为 ctx_len）
-- `.claude/skills/vpto-board-validate/lib/setup_main.py:178-182`（None → 填 0）
+- `.claude/skills/vpto-board-validate/lib/setup_main.py`（None → 填 0）
 
 ```python
-# setup_main.py:182（有 bug）：
+# setup_main.py（旧，有 bug）：
 param_decls.append(f"    {scal_type} {s['name']} = 0;  // FIXME: {hint}")
 ```
 
-### 修复方案
+### 修复方案（已实施）
 
-路由到 **测试框架**。与 C1b 同一个修复——从 `.pto` 的 `make_tensor_view`
-shape 维度推导每个 index scalar 的语义。具体方法：
+路由到 **测试框架**。✅ 已完整实施，采用 `derived` + `dumped` 双路径，
+按优先级 `derived > dumped > ctx_len(首个非spmd) > None(=0)` 解析每个
+index scalar：
 
-1. 解析 `.pto` 里的 `pto.make_tensor_view %argN, shape = [%argM, %cK, ...]`
-2. 对每个 `%argM: index`，找到它出现在哪个 tensor view 的哪个维度
-3. 从 `capture_meta.json` 的 `elem_counts` 或 `args_dump.json` 的 `shape`
-   反推该维度的实际值
-4. 把值填进 `load_vals`，让 `setup_main.py` 生成正确的 `main.cpp`
+1. **`derived`**（commit `aefe714`）——从 `.pto` 的 `make_tensor_view`
+   shape 推导：解析 `pto.make_tensor_view %argN, shape=[%argM, %cK, ...]`，
+   对每个 `%argM: index`，从 `capture_meta.json` 的 `elem_counts` 反推
+   `value = elem_count // product(other static dims)`。覆盖出现在 tensor
+   view shape 维度里的 scalar（如 `mtp_projection_rms` 的 `%arg5`/`%arg6`、
+   `hc_pre_linear` 的 `%arg4`/`%arg5`）。
+2. **`dumped`**——从 args_dump 的 `value` 字段捕获运行时 scalar 值。覆盖
+   **不在任何 tensor_view shape 里**的 scalar（partition_view offsets、
+   loop bounds、RNG seeds 等），如 `route_hash/v6`、`comb_sinkhorn/v5`、
+   `split_pre_post/v6,v7`（13 个残余 case）。
+   - `capture.py:harvest_kernel` 从 args_dump 的 `kind=="scalar"` 记录读
+     `value` 字段，写入 `capture_meta.json` 的 `scalar_values {vN: int}`。
+   - `vpto_run.py` 读 `scalar_values` → 标 sem=`"dumped"`。
+   - `setup_main.py` 在 `sem=="dumped"` 时 emit 真实值。
+3. **`ctx_len`**——首个非 SPMD scalar 仍走 `ctx_len`（= `B*S`，从 config.py
+   读），覆盖 trailing `T_DYN` index。
+4. **`None`**——其余（SPMD `block_idx`/`block_num` 等）走 setup_main
+   特殊分支：`spmd_block_num → 1`（单 block 启动），其余 → `0`。
 
-**验证**：修完后含多个 index 的 kernel（`mtp_projection_rms`、`proj_a_mm`、
-`hc_pre_linear` 等）不再因 view 坍缩而崩溃。
+**验证**：含多个 index 的 kernel（`mtp_projection_rms`、`hc_pre_linear`、
+`route_hash`、`comb_sinkhorn` 等）不再因 view 坍缩而崩溃。`validate.py`
+在每次 sweep 时重新生成 `capture_meta.json`（含最新 `scalar_values`），
+无 stale 数据风险。
 
 ---
 
@@ -378,7 +394,7 @@ source scripts/vpto_env.sh && export PTOAS_ROOT=$(dirname $PTOAS_BIN)
 
 ### 根因
 
-**文件**：`.claude/skills/vpto-board-validate/lib/setup_main.py:148-150`
+**文件**：`.claude/skills/vpto-board-validate/lib/setup_main.py`（ptr 循环）
 
 ```python
 param_decls.append(f"    size_t elemCount_{n} = {e};" + ...)
@@ -386,16 +402,32 @@ param_decls.append(f"    size_t fileSize_{n} = elemCount_{n} * sizeof({ct});")
 # 当 e=0 时 fileSize=0 → main.cpp 里 aclrtMallocHost(&ptr, 0) 失败
 ```
 
-### 修复方案
+### 修复方案（已实施）
 
-路由到 **测试框架**。两种思路：
+路由到 **测试框架**。✅ 采用"简单修"思路——当 `elemCount=0` 时跳过该
+ptr 的 alloc/memcpy/read/free，只传 nullptr 给 kernel。
 
-1. **简单修**：当 `elemCount=0` 时，`main.cpp` 跳过该 ptr 的 alloc +
-   memcpy + read，只传一个 nullptr 给 kernel。
-2. **正确修**：output-only ptr 的实际 numel 应该从 `.pto` 的 tensor view
-   shape 推导（与 C3 的 scalar_sem 修复联动），而不是依赖 dump 的 numel。
+**文件**：`.claude/skills/vpto-board-validate/lib/setup_main.py`
 
-**验证**：修完后 `hc_pre_linear` 不再因 0 字节 alloc 崩溃。
+ptr 循环里，`e = ec.get(n, 0)` 之后若 `e == 0`：
+- 仍 emit `elemCount_{n} = 0; // skipped: 0-elem` + `fileSize_{n}` +
+  `{ct} *{n}Host = nullptr;` + `{ct} *{n}Device = nullptr;`（保持 nullptr）
+- **跳过** `aclrtMallocHost`/`aclrtMalloc`（避免 size=0 失败）
+- **跳过** `ReadFile3`（避免 0 字节文件返回 false）
+- **跳过** `aclrtMemcpy`（0 字节拷贝无意义）
+- **跳过** `aclrtFree`/`aclrtFreeHost`（对 nullptr 安全但保持一致跳过）
+- kernel 收到 null GM ptr（单 block 启动在 0-elem 下不会访问它）
+
+非 0-elem ptr 的逻辑保持不变。
+
+**注意**：当前 sweep 里带 `elemCount=0` 的 kernel（`q_rope_prepare` v3/v4、
+`qr_rms_norm_quant` v3）都在 C5（ptoas tdivs lowering）阶段崩溃，到不了
+NPU run。C4 是 **latent 代码缺陷**：一旦 C5 修完（ptoas 侧已修），这些
+kernel 会到达 NPU run 并触发 C4——本修复提前堵住这个路径。
+
+**验证**：对 `q_rope_prepare.pto` 用 `elem_counts_override={v3:0, v4:0}`
+调用 `gen_main_cpp()`，确认 0-elem ptr 不再 emit `aclrtMallocHost`/
+`ReadFile3`，改传 `nullptr`；非 0-elem ptr 仍有完整 alloc/read/copy。
 
 ---
 
@@ -756,8 +788,8 @@ VMI 代码生成 bug。
 |---|---|---|---|---|
 | **P0** | C6: 加 i8→int8_t 映射 | 框架 | ~30 crash→pass/fail | ✅ 已实施（`pto_parse.py`） |
 | **P0** | C2: 加 inout harvest 分支 | 框架 | ~50 crash→pass/fail | ✅ 已实施（commit `dcc5568`） |
-| **P1** | C3: 从 .pto 推导 scalar 语义 | 框架 | ~45 crash + 3 精度 | ✅ 已实施（`derive_scalar_values`，commit `aefe714`） |
-| **P1** | C4: 跳过 0 字节 alloc | 框架 | ~30 crash→pass/fail | 简单（未实施） |
+| **P1** | C3: 从 .pto 推导 scalar 语义 | 框架 | ~45 crash + 3 精度 | ✅ 已实施（`derived` shape + `dumped` runtime value 双路径） |
+| **P1** | C4: 跳过 0 字节 alloc | 框架 | ~30 crash→pass/fail | ✅ 已实施（`setup_main.py` 跳过 0-elem alloc） |
 | **P2** | C5: 加 A5 tdivs i32 template | ptoas | ~80 crash→pass/fail | ✅ 已实施（fp32 绕行） |
 | **P2** | C1a: 修 inner-kernel 硬编码形状 | pypto | 5 精度 FAIL→pass | 需 pypto 侧 |
 | **P3** | VMI-UB: 修 VMI UB 对齐 | ptoas | 13 回归→pass | 需 ptoas 侧 |
@@ -765,5 +797,5 @@ VMI 代码生成 bug。
 | **P3** | C7b: aic/aiv split 按 func 锚定 | 框架 | ~6 crash | ✅ 已实施（`pto_parse`/`setup_vpto`/`vpto_run`） |
 | **P3** | C8b: 0-iter SPMD 标记 | 框架 | 2 crash→skip | ✅ 已实施（`NotExercised`） |
 
-**框架侧已修完 C2/C3/C6/C7b/C8b**。剩余框架项仅 C4（0 字节 alloc）。
+**框架侧已修完 C2/C3/C4/C6/C7b/C8b**。剩余框架项无。
 pypto 侧剩 C1a/C7a，ptoas 侧剩 VMI-UB。

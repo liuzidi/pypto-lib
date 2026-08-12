@@ -296,7 +296,22 @@ col-offset) get wrong dimensions → tile loops don't cover the GM tensor
 `index` args. Fix: derive scalar semantics from the `.pto`'s
 `make_tensor_view` shape dims, not just "first non-SPMD index".
 
+> **Fix status (2026-08-12):** ✅ Implemented via `derived` + `dumped`
+> dual-path in `pto_parse.py`/`setup_main.py`/`vpto_run.py`/`capture.py`.
+> `derived` recovers shape-derivable scalars from `elem_counts`; `dumped`
+> captures runtime scalar values from the args_dump `value` field for
+> scalars not in any tensor-view shape (partition offsets, seeds).
+> See `FIX_HANDOFF.md` §C3.
+
 ### 5.3 C4 — output-only ptr → 0-byte alloc → `aclrtMallocHost` fails
+
+> **Fix status (2026-08-12):** ✅ Implemented in `setup_main.py` — 0-elem
+> ptrs now skip alloc/read/copy/free and pass `nullptr` to the kernel.
+> See `FIX_HANDOFF.md` §C4 for details. Note: the `aclrtMallocHost
+> failed: 100000` error is **not** present in any current run result —
+> the 0-elem ptrs (`q_rope_prepare` v3/v4, `qr_rms_norm_quant` v3)
+> crash earlier at C5 (ptoas tdivs lowering). C4 was a latent code path
+> that would trigger once C5 is resolved.
 
 **Fault text:** `aclrtMallocHost failed: 100000 ... Invalid_Argument
 (EH0007): aclrtMallocHostImpl failed because value 0 for parameter size
@@ -665,3 +680,45 @@ wrong outputs become loud crashes.
 the 13-kernel UB-alignment bug is fixed in ptoas. Until then, the
 baseline route is safer (more passes, no regressions) but produces 7
 silent precision FAILs.
+
+### 10.7 PMU verification — `qr_proj_seed` VEC did NOT vanish
+
+> **Correction.** An earlier version of this section claimed VMI+membar
+> eliminated VEC compute entirely for `qr_proj_seed` (`aiv_vec_time`
+> 4.07 µs → 0.00 µs). That was an **msprof sampling artifact**, not a
+> real codegen effect. The kernel machine code is byte-identical between
+> the two routes.
+
+**Evidence — device kernel binary is identical across routes:**
+
+| artifact | baseline md5 | vmi md5 | identical? |
+|---|---|---|---|
+| fatobj `.text` section (552 bytes AICore code) | hex compare | hex compare | **yes, byte-identical** |
+| fatobj overall | `8aa9fa79...` | `ff0360a0...` | no (5 bytes differ at 0x0dab–0x0db0, metadata only) |
+| bisheng-linked `.so` | `bead9b16...` | `bead9b16...` | **yes** |
+| msprof dump `aicore_binary.o` (device-executed) | `45951db1...` | `45951db1...` | **yes** |
+
+ptoas's VMI flags changed fatobj metadata but bisheng compiled the same
+device kernel binary. The kernel cannot run differently.
+
+**msprof sampling artifact — 5 runs:**
+
+| run | freq (MHz) | task_us | aiv_vec_time | aiv_total_cycles |
+|---|---:|---:|---:|---:|
+| baseline r1 (warm-up=3) | 1650 | 27.4 | **4.07** | 43714 |
+| baseline r2 (warm-up=3) | **875** | 398.1 | 7.68 | 38852 |
+| baseline orig (warm-up=0) | 1650 | 27.7 | **4.07** | 43664 |
+| vmi orig (warm-up=0) | 1650 | 1.35 | **0.00** | **424** |
+| vmi r1 (warm-up=0) | **875** | 21.8 | **0.00** | **661** |
+
+The VMI runs report `aiv_total_cycles = 424/661` — impossible for a 552-byte
+`.text` (baseline runs show ~43700 cycles). The PMU sampled a launch
+placeholder task, not the real kernel execution. `warm-up=0` + task-based
+sampling on a ~1.3 µs "task" truncated the sampling window.
+
+**Corrected conclusion for §10.6:** the VMI route's precision improvements
+(7/8 FAILs fixed) are real and verified by golden compare. But the VEC-cycle
+performance claim ("VMI eliminates VEC") was an msprof artifact and is
+retracted. Reliable VEC-cycle measurement requires `--warm-up≥3`, multiple
+runs, frequency check, and cycle-count sanity validation (see
+`docs/debug-and-tune/vpto-msprof-pmu-collection.md` §7).

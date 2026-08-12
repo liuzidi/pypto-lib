@@ -146,10 +146,19 @@ def gen_main_cpp(info: dict, outputs: list, load_vals: dict | None = None,
         n, ct = p["name"], cpp_type(p["name"])
         e = ec.get(n, 0)
         param_decls.append(f"    size_t elemCount_{n} = {e};" +
-                           ("" if e else "  // FIXME: dynamic shape"))
+                           ("" if e else "  // skipped: 0-elem (dynamic shape)"))
         param_decls.append(f"    size_t fileSize_{n} = elemCount_{n} * sizeof({ct});")
         ptr_decls.append(f"    {ct} *{n}Host = nullptr;")
         ptr_decls.append(f"    {ct} *{n}Device = nullptr;")
+        if not e:
+            # C4: a 0-elem ptr (dynamic shape whose numel wasn't captured, or a
+            # genuinely empty output) would make aclrtMallocHost/Malloc fail on
+            # size=0 (ACL 100000 / EH0007) and ReadFile3 fail on a 0-byte file.
+            # Skip alloc/read/copy/free for it — both Host/Device stay nullptr
+            # and the kernel receives a null GM ptr (single-block launch never
+            # touches it under 0-elem). This unblocks kernels that crash at
+            # the alloc stage before reaching the real precision test.
+            continue
         alloc_host.append(f"    ACL_CHECK(aclrtMallocHost((void **)(&{n}Host), fileSize_{n}));")
         alloc_dev.append(f"    ACL_CHECK(aclrtMalloc((void **)&{n}Device, fileSize_{n}, ACL_MEM_MALLOC_HUGE_FIRST));")
         free_dev.append(f"    aclrtFree({n}Device);")
