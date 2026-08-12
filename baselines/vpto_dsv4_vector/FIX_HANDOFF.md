@@ -1,0 +1,637 @@
+# DSV4 VPTO 精度问题调查 + 修复交接文档
+
+> **目的**：把 338-kernel 全量扫描发现的所有问题按"背景 → 复现 →
+> 根因 → 修复方案"分类写清楚，让接手的人能独立定位和修复每个问题。
+>
+> **配套文件**：
+> - 完整调查报告：`PRECISION_REPORT.md`
+> - baseline 扫描结果：`sweep_results.csv`（338 行）
+> - vmi-membar-vfoff 扫描结果：`sweep_results_vmi-membar-vfoff.csv`（338 行）
+> - 汇总表：`SUMMARY_TABLE.md`
+
+---
+
+## 0. 背景知识
+
+### 0.1 VPTO 编译路线（Route 2）
+
+DSV4 kernel 从 pypto 的 `.pto` 到 NPU 执行经过三步：
+
+```
+.pto (pypto IR)  ──ptoas──▶  fatobj .o (LLVM bitcode + 嵌套 ELF)
+                             ──bisheng──▶  .so + host binary
+                                          ──CANN──▶  NPU 执行
+```
+
+- **ptoas**：把 `.pto`（tile dialect IR）编译成 A5 fatobj。内部走 ptodsl
+  daemon 的模板匹配（NoMatchingTemplate = 该 op 在 A5 上没有模板）。
+- **bisheng**：CANN 的编译器，把 fatobj + launch.cpp 链接成可执行 .so
+  + host binary。支持 VF（Vector Fusion）后端优化。
+- **CANN**：`aclrtMalloc` / `aclrtMemcpy` / `aclrtSynchronizeStream` 等
+  runtime API，host binary 通过它们驱动 NPU。
+
+### 0.2 测试框架架构
+
+```
+                          Route 1 capture (DFX)           Route 2 replay (board)
+  ┌──────────┐   run_jit w/   ┌──────────────┐  harvest  ┌──────────────┐  ptoas+bisheng  ┌─────┐
+  │ model.py │ ───────────▶ │ args_dump.json│ ────────▶ │ vN.bin /      │ ──────────────▶ │ NPU │ → compare
+  │ (@pl.jit)│   enable_     │ name_map_*.   │  (capture │ golden_vN.bin │                 │     │
+  └──────────┘   dump_args=2 │  json         │  .py)     │ capture_meta  │                 └─────┘
+                 +dep_gen     └──────────────┘           └──────────────┘
+```
+
+- **Route 1 capture**：用 simpler 的 `run_jit` 跑模型，开 `enable_dump_args=2`
+  + `enable_dep_gen=True`，把每个 kernel 的 GM 输入/输出 dump 到
+  `args.bin` + `args_dump.json`。
+- **harvest**：`capture.py` 从 dump 里按 kernel name + func_id 提取单个
+  kernel 的输入/输出字节，写成 `vN.bin` / `golden_vN.bin`。
+- **Route 2 replay**：`vpto_run.py` 用同一份 `.pto` 走 ptoas→bisheng→NPU，
+  喂入 harvest 出来的 `vN.bin`，NPU 输出和 `golden_vN.bin` 比对。
+
+### 0.3 关键概念
+
+| 术语 | 含义 |
+|---|---|
+| **leaf kernel** | ptr-arg 与 module TensorSpec 一一对应的 kernel（可直接从模型生成 golden） |
+| **inner kernel** | ptr-arg 是前序 kernel 的中间结果，需要 Phase 5 capture |
+| **SPMD** | Single Program Multiple Data，一个 kernel 多 block 并行 |
+| **inout ptr** | 同一个 GM buffer 既是输入又是输出（read-modify-write） |
+| **UB** | Unified Buffer，A5 的 local memory（vector core 私有） |
+| **membar** | vecscope memory barrier，ptoas 的 `--enable-vecscope-mem-bar` 插入的同步 |
+| **VMI** | Vector Memory Interface fusion，ptoas 的 `--enable-vmi` 融合流水线 |
+| **VF-fusion** | bisheng 的 Vector Fusion 后端优化（可关） |
+
+### 0.4 如何运行
+
+```bash
+# 前置：激活 VPTO 环境
+source scripts/vpto_env.sh
+export PTOAS_ROOT=$(dirname $PTOAS_BIN)
+
+# 全量扫描（baseline 路线）
+.venv/bin/python3 tests/dsv4_validate/validate.py --all-modules -d 0 --route baseline
+
+# 全量扫描（vmi-membar-vfoff 路线）
+.venv/bin/python3 tests/dsv4_validate/validate.py --all-modules -d 0 --route vmi-membar-vfoff
+
+# 单模块调试
+.venv/bin/python3 tests/dsv4_validate/validate.py --module attention_csa -d 0 --route baseline
+
+# 单 kernel 直接调用 vpto_run（绕过 validate.py 框架）
+.venv/bin/python3 .claude/skills/vpto-board-validate/vpto_run.py \
+  --pto build_output/_jit_attention_csa_test_*/ptoas/merge_norm.pto \
+  --model-py models/deepseek_v4_pro/decode_attention_csa.py \
+  --mode decode --device 0 --kernel merge_norm --route baseline \
+  --captured-dump build_output/vpto_merge_norm/run
+```
+
+### 0.5 问题总览
+
+338 个 (module, kernel) 尝试，129 个不同 kernel basename。286 个非 pass 行
+分解为 **8 个根因类**，按责任层分两组：
+
+| 责任层 | 根因类 | 数量 | 修了能转化多少行 |
+|---|---|---:|---:|
+| **测试框架** | C2/C3/C4/C6/C8 | ~180 | crash→pass 或 crash→真精度 FAIL |
+| **pypto/ptoas** | C1/C5/C7 + VMI UB | ~106 | 需要在编译器侧修 |
+
+---
+
+## C1 — 精度 FAIL：local-mem 泄漏 + scalar=0（8 行）
+
+### 背景
+
+这是唯一一类"kernel 跑完了但输出错"的真精度问题。8 个 case 共 3 个
+kernel basename：
+
+- `rms_norm`（5 行，attention_csa/swa + prefill_csa/hca/swa）
+- `proj_a_mm`（2 行，attention_csa + sparse_attn）
+- `mtp_projection_rms`（1 行，mtp_projection）
+
+### 复现
+
+```bash
+source scripts/vpto_env.sh && export PTOAS_ROOT=$(dirname $PTOAS_BIN)
+
+# rms_norm（inner kernel，来自 attention_csa 模块）
+# 检查输入/输出
+.venv/bin/python3 -c "
+import numpy as np
+v2 = np.fromfile('build_output/vpto_rms_norm/run/v2.bin', dtype=np.uint16)
+gv2 = np.fromfile('build_output/vpto_rms_norm/run/golden_v2.bin', dtype=np.uint16)
+print(f'NPU out nonzero: {np.count_nonzero(v2)}, golden nonzero: {np.count_nonzero(gv2)}')
+# 预期：NPU 有 7 个非零（1.0, 1000.0, 999424.0），golden 全零
+"
+
+# mtp_projection_rms
+.venv/bin/python3 -c "
+import numpy as np
+v3 = np.fromfile('build_output/vpto_mtp_projection_rms/run/v3.bin', dtype=np.float32)
+print(f'NPU v3: {v3[:16]}')  # 预期：idx 8-15 是 1000.0
+"
+```
+
+### 根因
+
+**两个不同的 bug，碰巧产生同一个指纹（输入全零 → NPU 泄漏中间值）。**
+
+#### C1a — `rms_norm` family（5 行）：pypto inner-kernel 硬编码形状 + local-mem 地址冲突
+
+**文件**：pypto 的 inner-kernel codegen（不是本仓库代码）
+
+**根因**：
+- standalone leaf `rms_norm` 的 `.pto` 用动态行维 `shape = [%arg3, ...]`
+  （caller 传入），PASS。
+- inner-kernel `rms_norm` 的 `.pto` 把行维硬编码成 `shape = [%c128_index, ...]`
+  并删掉了 `%arg3` 参数。fatobj 不同（8712B vs 8568B）。
+- 硬编码 128 行 + 单 block（spmd_block_num=1）→ 只有 8/128 行被写入，
+  其余 120 行的 output tile 在 local memory（UB）里与 fp32 reduction 中间值
+  共用同一地址（`addr=8768`），bf16 tstore 只写 2 bytes/elem，fp32 残留的
+  高 2 bytes 泄漏成 bf16 输出。
+- 泄漏值：`1.0`(0x3F80)、`1000.0`(0x447A = `rsqrt(1e-6)`)、
+  `999424.0`(0x4974 = stale reduction accumulator)
+- 位置：flat idx 256/257/258/259/512/513/768 — 128-col tile 的起始位置
+
+**diff 验证**：
+```bash
+diff build_output/_jit_rms_norm_test_*/ptoas/rms_norm.pto \
+     build_output/vpto_rms_norm/rms_norm.pto
+# 关键差异：
+# - shape = [%arg3, %c7168_index]        ← leaf：动态行维（PASS）
+# + shape = [%c128_index, %c7168_index]  ← inner：硬编码 128（FAIL）
+```
+
+#### C1b — `mtp_projection_rms` + `proj_a_mm`（3 行）：框架 scalar_sem=0 bug
+
+**文件**：
+- `.claude/skills/vpto-board-validate/vpto_run.py:402-415`（scalar_sem 推导）
+- `.claude/skills/vpto-board-validate/lib/setup_main.py:182`（默认填 0）
+
+**根因**：
+- `vpto_run.py` 的 scalar_sem 推导只把**第一个**非 SPMD index 标为 `ctx_len`，
+  其余 index 标为 `None`。
+- `setup_main.py:182` 对 `None` 语义的 scalar 默认填 `0`：
+  ```python
+  param_decls.append(f"    {scal_type} {s['name']} = 0;  // FIXME: {hint}")
+  ```
+- `mtp_projection_rms` 的 `.pto` 有 3 个 index scalar（`%arg4`=ctx_len,
+  `%arg5`=行数, `%arg6`=列数），但 `main.cpp` 生成 `v5=8`（正确）、
+  `v6=0`、`v7=0`（错误）。tensor view `shape=[%arg5=0, ...]` 坍缩为 0 行 →
+  SPMD 循环不写任何元素 → `rsqrt(eps)=1000.0` 中间值泄漏到 output。
+- `proj_a_mm` 同理：4 个 index scalar，只第一个被填对，其余 3 个填 0 →
+  cube kernel 越界读 → NaN / 1.95e+38。
+
+### 修复方案
+
+#### C1a（pypto 侧，5 行）
+
+路由到 **pypto**。inner-kernel codegen 应保持动态行维（像 leaf 变体那样），
+或者在硬编码形状时确保 output tile 的 local-mem 地址与 fp32 中间值 tile
+不冲突。这需要 pypto 侧的 codegen 修复，不在本仓库。
+
+#### C1b（框架侧，3 行）
+
+路由到 **测试框架**。`vpto_run.py` 的 scalar_sem 推导应从 `.pto` 的
+`make_tensor_view` shape 维度推导每个 index scalar 的语义，而不是只标第一个：
+
+```python
+# 当前（vpto_run.py:407-413，有 bug）：
+for p in info["params"]:
+    if p["pto_type"] in ("i32", "index"):
+        sig = p.get("sig_name", "") or p["name"]
+        if not ctx_marked and "spmd" not in sig:
+            scalar_sem.append("ctx_len")     # ← 只有第一个
+            ctx_marked = True
+        else:
+            scalar_sem.append(None)          # ← 其余 → setup_main 填 0
+
+# 修复方向：解析 .pto 的 make_tensor_view shape，把每个 index 参数
+# 匹配到它对应的 tensor 维度大小（从 capture_meta elem_counts 反推），
+# 或从 args_dump.json 的 shape 字段直接读
+```
+
+**验证**：修完后 `mtp_projection_rms` 应该 PASS（输入全零 → 输出全零，
+不再泄漏 1000.0）。`proj_a_mm` 应该 PASS 或变成真精度 FAIL（取决于 cube
+kernel 在正确索引下是否精确）。
+
+---
+
+## C2 — inout role 未 harvest → vN.bin 缺失（~50 行）
+
+### 背景
+
+`capture.py` 的 harvest 逻辑只匹配 `role=="input"` 和 `role=="output"`，
+不匹配 `role=="inout"`。很多 kernel 有 inout ptr（同一个 GM buffer
+既读又写），这些 arg 的 dump 记录被完全跳过 → `vN.bin` 不生成 →
+`main.cpp` 的 `ReadFile3("./vN.bin")` 失败 → NPU host binary 退出 1。
+
+### 复现
+
+```bash
+source scripts/vpto_env.sh && export PTOAS_ROOT=$(dirname $PTOAS_BIN)
+
+# comb_sinkhorn（attention_csa，decode）— 典型 inout kernel
+.venv/bin/python3 -c "
+import json, glob
+DUMP='build_output/_jit_attention_csa_test_20260811_224123'
+d = json.load(open(f'{DUMP}/dfx_outputs/args_dump/args_dump.json'))
+args = d['args']
+nm = json.load(open(glob.glob(f'{DUMP}/dfx_outputs/name_map_*.json')[0]))
+fid = [int(k) for k,v in nm['callable_id_to_name'].items() if v=='comb_sinkhorn'][0]
+recs = [a for a in args if fid in a['func_id']]
+from collections import Counter
+print('roles:', Counter(a['role'] for a in recs))
+# 预期：role=inout（arg3），但 harvest 只找 role=input/output
+# → arg3 被跳过 → v4.bin 不生成
+"
+
+# 运行 vpto_run 看错误
+.venv/bin/python3 .claude/skills/vpto-board-validate/vpto_run.py \
+  --pto build_output/_jit_attention_csa_test_20260811_224123/ptoas/comb_sinkhorn.pto \
+  --model-py models/deepseek_v4_pro/decode_attention_csa.py \
+  --mode decode --device 0 --kernel comb_sinkhorn --route baseline \
+  --captured-dump build_output/vpto_comb_sinkhorn/run \
+  --build-dir build_output/_probe_comb_sinkhorn 2>&1 | grep "Failed to read\|v4.bin"
+# 预期：Failed to read v4.bin / Failed to get file. Path = ./v4.bin
+```
+
+### 根因
+
+**文件**：`tests/dsv4_validate/capture.py:155-160`
+
+```python
+# 当前（有 bug）：
+if a["role"] == "input" and a["stage"] == "before_dispatch":
+    if ai not in inputs:
+        inputs[ai] = a
+elif a["role"] == "output" and a["stage"] == "after_completion":
+    if ai not in outputs:
+        outputs[ai] = a
+# ← 没有 role=="inout" 的分支！
+```
+
+dump 里的 role 有三种：`input`、`output`、`inout`。`inout` 的 arg 在
+`before_dispatch` 阶段有输入快照，在 `after_completion` 阶段有输出快照。
+harvest 应该把 `inout` 当作既 input 又 output。
+
+### 修复方案
+
+路由到 **测试框架**。`capture.py:155-160` 加 `inout` 分支：
+
+```python
+# 修复：
+if a["role"] in ("input", "inout") and a["stage"] == "before_dispatch":
+    if ai not in inputs:
+        inputs[ai] = a
+if a["role"] in ("output", "inout") and a["stage"] == "after_completion":
+    if ai not in outputs:
+        outputs[ai] = a
+```
+
+**受影响 kernel**：`comb_sinkhorn`、`kv_score_proj`、`kv_score_proj_0`、
+`kv_touch`、`gate_pre_route`、`hc_head_seed` 等所有含 inout ptr 的 kernel。
+
+**验证**：修完后 `comb_sinkhorn` 应该能读到 `v4.bin`，然后要么 PASS
+要么变成真精度 FAIL（取决于 kernel 本身是否正确）。
+
+---
+
+## C3 — index scalar 默认填 0 → tensor view 坍缩（~45 行）
+
+### 背景
+
+与 C1b 同一个 bug，但这里表现为 NPU 崩溃而非精度 FAIL。多个 index
+scalar 的 kernel 中，只有第一个被填对（ctx_len），其余填 0，导致
+tensor view 维度坍缩 → SPMD 循环不执行 → AICore 异常或空输出。
+
+### 复现
+
+```bash
+# mtp_projection_rms 的 main.cpp — 看 scalar 赋值
+grep "int64_t v\|FIXME" build_output/vpto_mtp_projection_rms/run/main.cpp
+# 预期：
+#   int64_t v5 = 8;   // ctx_len（正确）
+#   int64_t v6 = 0;   // FIXME: sig=arg5（应为行数，被填 0）
+#   int64_t v7 = 0;   // FIXME: sig=arg6（应为列数，被填 0）
+```
+
+### 根因
+
+**文件**：
+- `.claude/skills/vpto-board-validate/vpto_run.py:407-413`（scalar_sem 推导，
+  只标第一个非 SPMD index 为 ctx_len）
+- `.claude/skills/vpto-board-validate/lib/setup_main.py:178-182`（None → 填 0）
+
+```python
+# setup_main.py:182（有 bug）：
+param_decls.append(f"    {scal_type} {s['name']} = 0;  // FIXME: {hint}")
+```
+
+### 修复方案
+
+路由到 **测试框架**。与 C1b 同一个修复——从 `.pto` 的 `make_tensor_view`
+shape 维度推导每个 index scalar 的语义。具体方法：
+
+1. 解析 `.pto` 里的 `pto.make_tensor_view %argN, shape = [%argM, %cK, ...]`
+2. 对每个 `%argM: index`，找到它出现在哪个 tensor view 的哪个维度
+3. 从 `capture_meta.json` 的 `elem_counts` 或 `args_dump.json` 的 `shape`
+   反推该维度的实际值
+4. 把值填进 `load_vals`，让 `setup_main.py` 生成正确的 `main.cpp`
+
+**验证**：修完后含多个 index 的 kernel（`mtp_projection_rms`、`proj_a_mm`、
+`hc_pre_linear` 等）不再因 view 坍缩而崩溃。
+
+---
+
+## C4 — output-only ptr 的 0 字节 alloc → aclrtMallocHost 失败（~30 行）
+
+### 背景
+
+`setup_main.py` 从 `capture_meta.json` 的 `elem_counts` 计算 buffer 大小
+`fileSize = elemCount × sizeof(dtype)`。当一个 output-only ptr 的
+`numel=0`（dump 记录里 shape=[] 或 elem_counts 没有该 ptr），`fileSize=0`
+→ `aclrtMallocHost(0)` 失败：
+
+```
+aclrtMallocHost failed: 100000
+Invalid_Argument(EH0007): aclrtMallocHostImpl failed because value 0
+for parameter size is invalid. Expected value: must be greater than zero.
+```
+
+### 复现
+
+```bash
+source scripts/vpto_env.sh && export PTOAS_ROOT=$(dirname $PTOAS_BIN)
+.venv/bin/python3 .claude/skills/vpto-board-validate/vpto_run.py \
+  --pto build_output/_jit_attention_csa_test_20260811_224123/ptoas/hc_pre_linear.pto \
+  --model-py models/deepseek_v4_pro/decode_attention_csa.py \
+  --mode decode --device 0 --kernel hc_pre_linear --route baseline \
+  --captured-dump build_output/vpto_hc_pre_linear/run \
+  --build-dir build_output/_probe_hc_pre_linear 2>&1 | grep "aclrtMallocHost\|size is invalid"
+```
+
+### 根因
+
+**文件**：`.claude/skills/vpto-board-validate/lib/setup_main.py:148-150`
+
+```python
+param_decls.append(f"    size_t elemCount_{n} = {e};" + ...)
+param_decls.append(f"    size_t fileSize_{n} = elemCount_{n} * sizeof({ct});")
+# 当 e=0 时 fileSize=0 → main.cpp 里 aclrtMallocHost(&ptr, 0) 失败
+```
+
+### 修复方案
+
+路由到 **测试框架**。两种思路：
+
+1. **简单修**：当 `elemCount=0` 时，`main.cpp` 跳过该 ptr 的 alloc +
+   memcpy + read，只传一个 nullptr 给 kernel。
+2. **正确修**：output-only ptr 的实际 numel 应该从 `.pto` 的 tensor view
+   shape 推导（与 C3 的 scalar_sem 修复联动），而不是依赖 dump 的 numel。
+
+**验证**：修完后 `hc_pre_linear` 不再因 0 字节 alloc 崩溃。
+
+---
+
+## C5 — ptoas pto.tdivs / pto.tstore 无 A5 template（~80 行）
+
+### 背景
+
+ptoas 的 A5 模板库没有 `pto.tdivs`（tile 标量除法）的 i32 dtype 签名
+模板。pypto 在整数除法场景（Sinkhorn 归一化、route hashing 等）会发出
+`pto.tdivs` op，ptoas 找不到匹配模板 → lowering 失败。
+
+### 复现
+
+```bash
+source scripts/vpto_env.sh && export PTOAS_ROOT=$(dirname $PTOAS_BIN)
+# merge_norm（典型 tdivs kernel）
+.venv/bin/python3 .claude/skills/vpto-board-validate/vpto_run.py \
+  --pto build_output/_jit_attention_csa_test_20260811_224123/ptoas/merge_norm.pto \
+  --model-py models/deepseek_v4_pro/decode_attention_csa.py \
+  --mode decode --device 0 --kernel merge_norm --route baseline \
+  --captured-dump build_output/vpto_merge_norm/run \
+  --build-dir build_output/_probe_merge_norm 2>&1 | grep "NoMatchingTemplate"
+```
+
+预期错误：
+```
+NoMatchingTemplate: no legal template for op='pto.tdivs' target='a5';
+  template_tdivs_tile_scalar: dtype signature ('i32', 'i32', 'i32') is not supported;
+  template_tdivs_scalar_tile: ... not supported;
+  vmi_tdivs: ... not supported;
+  vmi_tdivs_scalar_tile: ... not supported
+```
+
+### 根因
+
+**文件**：ptoas 的 A5 模板库（`ptodsl/` 下的 template 定义，不在本仓库）
+
+**受影响 kernel（已确认）**：`merge_norm`、`rope_cs`、`rmsnorm_rope`、
+`route_hash`、`rope`、`prefill_c4_rmsnorm_rope`、`prefill_idx_c4_rmsnorm_rope`、
+`prefill_hca_c128_rmsnorm_rope`、`qr_rms_norm_quant` 等。所有含 `pto.tdivs`
+op 且操作 i32 tile 的 kernel。
+
+另一个变体：`ffn_norm` 命中 `pto.tstore` 的 NoMatchingTemplate（6 个候选
+模板的 custom constraints 不满足）。
+
+### 修复方案
+
+路由到 **ptoas**。两个方向：
+
+1. **加模板**：在 ptoas 的 A5 模板库里给 `tdivs` 加 i32 dtype 签名。
+2. **在 pypto 侧 lowering**：让 pypto 把 i32 `tdivs` lower 成 fp32 除法 +
+   cast，绕过模板缺口。
+
+**VMI 路线的发现**：开 `--enable-vmi` 后，`merge_norm`（decode）的 tdivs
+被 VMI 融合掉 → 不再触发模板缺失 → PASS。但其他 kernel 的 tdivs 不在
+融合区域里，仍崩溃。所以 VMI 不能替代模板修复。
+
+**验证**：加模板后 `merge_norm`（baseline 路线）应能编译通过。
+
+---
+
+## C6 — PTO_TO_CPP 缺 i8→int8_t 映射（~30 行）
+
+### 背景
+
+`.pto` 用 `!pto.ptr<i8>`（int8 量化权重 / int8 输出）。`pto_parse.py` 的
+`PTO_TO_CPP` 映射表没有 `i8` 条目 → `setup_main.py` 生成 `launch.cpp`
+时写出原始 `i8` → bisheng 不认 `i8`（要 `int8_t`）→ 编译失败。
+
+### 复现
+
+```bash
+source scripts/vpto_env.sh && export PTOAS_ROOT=$(dirname $PTOAS_BIN)
+.venv/bin/python3 .claude/skills/vpto-board-validate/vpto_run.py \
+  --pto build_output/_jit_attention_csa_test_20260811_224123/ptoas/quant.pto \
+  --model-py models/deepseek_v4_pro/decode_attention_csa.py \
+  --mode decode --device 0 --kernel quant --route baseline \
+  --captured-dump build_output/vpto_quant/run \
+  --build-dir build_output/_probe_quant 2>&1 | grep "unknown type name"
+```
+
+预期错误：
+```
+launch.cpp:35:79: error: unknown type name 'i8'
+extern "C" __global__ AICORE void quant(__gm__ float* v1, __gm__ i8* v2, ...);
+```
+
+### 根因
+
+**文件**：`.claude/skills/vpto-board-validate/lib/pto_parse.py:183-185`
+
+```python
+# 当前（有 bug）：
+PTO_TO_CPP = {"f32": "float", "bf16": "bfloat16_t", "f16": "half",
+              "i32": "int32_t", "i64": "int64_t", "i16": "int16_t",
+              "index": "int64_t"}
+# ← 缺 "i8": "int8_t", "u8": "uint8_t"
+```
+
+**受影响 kernel**：`quant`、`score_mat`、`kv_and_cache_write`、
+`qproj_matmul`、`exp_gate_mm`、`exp_h_q`、`sh_gate_mm`、`sh_up_mm`、
+`exp_up_mm`、`sh_w2_mm`、`exp_w2_mm`、`x_norm_quant` 等所有含
+`!pto.ptr<i8>` 的 kernel。
+
+### 修复方案
+
+路由到 **测试框架**。一行修复：
+
+```python
+# pto_parse.py:183 修复：
+PTO_TO_CPP = {"f32": "float", "bf16": "bfloat16_t", "f16": "half",
+              "i32": "int32_t", "i64": "int64_t", "i16": "int16_t",
+              "i8": "int8_t", "u8": "uint8_t",   # ← 新增
+              "index": "int64_t"}
+```
+
+同时检查 `_DTYPE_TO_NP`（capture.py）是否也需要加 `INT8`/`UINT8` 的映射。
+
+**验证**：修完后 `quant` 的 `launch.cpp` 应生成 `int8_t*` 而非 `i8*`，
+bisheng 编译通过。
+
+---
+
+## C7 — SSA dominance + _aic/_aiv split（~6 行）
+
+### 背景
+
+两个子问题：
+
+### C7a — `build_valid.pto` 的 SSA dominance 违规
+
+**复现**：`attention_hca` 模块的 capture 步骤就失败（pypto 发出的 .pto
+本身有 SSA 违规）：
+
+```bash
+cat build_output/_jit_attention_hca_test_*/report/codegen_errors.txt
+# 预期：
+# ptoas compilation failed: error: operand #0 does not dominate this use
+```
+
+**根因**：pypto 生成的 `build_valid.pto:27:3` 有一个 SSA 值在定义前被使用。
+路由到 **pypto**。
+
+### C7b — `_aic`/`_aiv` split kernel 找不到 .pto
+
+**受影响**：`qk_pv_aic`、`qk_pv_aiv`、`gate_aic`、`gate_aiv`、
+`mtp_projection_linear_aic`、`mtp_projection_linear_aiv`
+
+**根因**：这些 kernel 在运行时被 split 成 AIC + AIV 两个编译产物，
+但 capture dump 的 `name_map` 不产生 `*_aic`/`*_aiv` 的独立条目。
+harvest 按 name 查找 → 找不到 → 无 .pto。
+
+**修复方案**：路由到 **测试框架**。`capture.py` 或 `validate.py` 需要识别
+`*_aic`/`*_aiv` 后缀，映射回原始 kernel name 的 .pto（可能是同一个 .pto
+的两个 symbol，或需要分开编译）。
+
+---
+
+## C8 — 0-iter SPMD / kernel 未被调度（7 行）
+
+### 背景
+
+两类：
+
+### C8a — inout role 未匹配（5/7 行，与 C2 同根因）
+
+`kv_touch`、`gate_pre_route`、`hc_head_seed` 在 dump 里有 `role=inout`
+记录但无 `role=input/output` 记录 → harvest 跳过。修 C2 的同时自动修复。
+
+### C8b — 真正的 0-iter SPMD（2/7 行）
+
+`hc_post_inactive_pad` 在 prefill 模块的 `deps.json` 里**没有任何 task
+含该 kernel_id** — 该 kernel 的分支在当前测试输入下未被触发，SPMD 循环
+体从未执行 → 没有 dump 数据。
+
+### 修复方案
+
+- C8a：修 C2 自动修复。
+- C8b：路由到 **测试框架 + 测试输入**。框架应把这类 kernel 标记为
+  "not-exercised"（而非 "crash"），并需要换一个能触发该分支的测试输入。
+
+---
+
+## VMI-UB — VMI+membar 路线的 UB 对齐崩溃（13 行，仅 vmi-membar-vfoff 路线）
+
+### 背景
+
+vmi-membar-vfoff 路线新引入的 13 个回归：baseline PASS 的 kernel 在
+VMI 路线下 AICore 崩溃。
+
+### 复现
+
+```bash
+source scripts/vpto_env.sh && export PTOAS_ROOT=$(dirname $PTOAS_BIN)
+# mix_x（attention_csa，decode）
+.venv/bin/python3 .claude/skills/vpto-board-validate/vpto_run.py \
+  --pto build_output/_jit_attention_csa_test_20260811_224123/ptoas/mix_x.pto \
+  --model-py models/deepseek_v4_pro/decode_attention_csa.py \
+  --mode decode --device 0 --kernel mix_x --route vmi-membar-vfoff \
+  --captured-dump build_output/vpto_mix_x/run \
+  --build-dir build_output/_probe_vmi_mixx 2>&1 | grep "not aligned\|AICore\|exception"
+```
+
+预期错误：
+```
+errcode:(340) errorStr: The address for VEC to access UB is not aligned.
+retCode=0x31, vector core exception.
+fault kernel_name=mix_x
+```
+
+### 根因
+
+**文件**：ptoas 的 VMI 流水线 codegen（不在本仓库）
+
+**受影响 kernel**：`mix_x`（6 模块）、`merge_norm`（4 个 prefill 模块）、
+`rms_norm` leaf、`hc_head_reduce`、`mtp_projection_norm`
+
+VMI 融合流水线在处理这些 kernel 形状时生成了 UB 未对齐访存指令。
+注意 `merge_norm` 的 decode 变体在 VMI 下 PASS（小 tile `[8,...]`），
+但 prefill 变体崩溃（大 tile `[128,...]`）—— 说明是 tile 形状触发的
+VMI 代码生成 bug。
+
+### 修复方案
+
+路由到 **ptoas**（VMI 流水线）。修复后 VMI 路线应从 45 PASS 回升到
+~58 PASS（恢复 13 个回归），同时保持 7/8 精度 FAIL 的修复。
+
+---
+
+## 修复优先级建议
+
+| 优先级 | 修复项 | 责任层 | 预期转化 | 难度 |
+|---|---|---|---|---|
+| **P0** | C6: 加 i8→int8_t 映射 | 框架 | ~30 crash→pass/fail | 1 行 |
+| **P0** | C2: 加 inout harvest 分支 | 框架 | ~50 crash→pass/fail | 5 行 |
+| **P1** | C3: 从 .pto 推导 scalar 语义 | 框架 | ~45 crash + 3 精度 | 中等 |
+| **P1** | C4: 跳过 0 字节 alloc | 框架 | ~30 crash→pass/fail | 简单 |
+| **P2** | C5: 加 A5 tdivs i32 template | ptoas | ~80 crash→pass/fail | 需 ptoas 侧 |
+| **P2** | C1a: 修 inner-kernel 硬编码形状 | pypto | 5 精度 FAIL→pass | 需 pypto 侧 |
+| **P3** | VMI-UB: 修 VMI UB 对齐 | ptoas | 13 回归→pass | 需 ptoas 侧 |
+| **P3** | C7: SSA + aic/aiv split | pypto+框架 | ~6 crash | 中等 |
+| **P3** | C8b: 0-iter SPMD 标记 | 框架 | 2 crash→skip | 简单 |
+
+**修完 P0+P1（框架侧，~4 处修改）可转化 ~155 行**（54% 的失败）。
