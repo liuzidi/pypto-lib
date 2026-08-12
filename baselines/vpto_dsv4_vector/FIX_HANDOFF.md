@@ -96,6 +96,11 @@ export PTOAS_ROOT=$(dirname $PTOAS_BIN)
 | **测试框架** | C2/C3/C4/C6/C8 | ~180 | crash→pass 或 crash→真精度 FAIL |
 | **pypto/ptoas** | C1/C5/C7 + VMI UB | ~106 | 需要在编译器侧修 |
 
+> **当前状态**：框架侧 C2/C3/C6/C7b/C8b 已修，仅剩 C4。pypto 侧剩
+> C1a/C7a，ptoas 侧剩 VMI-UB（C5 已在 ptoas 源树修完）。
+> 注：C7 实际跨两层——C7a（SSA dominance）在 pypto，C7b（aic/aiv split
+> 按 func 锚定）在框架已修。
+
 ---
 
 ## C1 — 精度 FAIL：local-mem 泄漏 + scalar=0（8 行）
@@ -426,29 +431,62 @@ NoMatchingTemplate: no legal template for op='pto.tdivs' target='a5';
 
 ### 根因
 
-**文件**：ptoas 的 A5 模板库（`ptodsl/` 下的 template 定义，不在本仓库）
+**文件**：`PTOAS/ptodsl/ptodsl/tilelib/templates/a5/tdivs.py` 的 `_DTYPES`
+只注册了 `f16`/`f32`，没有 `i32` 签名 → 模板匹配在 dtype 签名阶段就被拒。
 
-**受影响 kernel（已确认）**：`merge_norm`、`rope_cs`、`rmsnorm_rope`、
-`route_hash`、`rope`、`prefill_c4_rmsnorm_rope`、`prefill_idx_c4_rmsnorm_rope`、
-`prefill_hca_c128_rmsnorm_rope`、`qr_rms_norm_quant` 等。所有含 `pto.tdivs`
-op 且操作 i32 tile 的 kernel。
+**修正一个文档里的误述**：原报告说"A5 only supports tdivs for fp32"——
+这只对 ptodsl 模板层。硬件/IR 层 i32 其实是通的：
+- pto-isa A5 `TDivS.hpp` 的 `TDIVS_IMPL` static_assert 允许
+  `int32_t/uint32_t/int16_t/uint16_t`，整数走 `TDivs_naive` 标量循环。
+- ptodsl `pto.vdiv` verifier 接受 `si32/i32/f16/f32`。
+
+但 **A5 vector core 没有整数 `vdiv` 指令**：直接对 i32 用 `pto.vdiv` 会
+lower 成不存在的 `llvm.hivm.vdiv.vNi32.x` builtin，链接/bisheng 阶段会失败。
+正确的整数除法路径是 **fp32 绕行**（`vcvt i32→f32, round` → `vdiv` →
+`vcvt f32→i32, truncate, NOSAT`）——这跟同仓库 `template_tcolexpanddiv_i32`
+的既有约定一致。`lib/TileOps/math.py` 里还有更完整的 `_tl_soft_vdiv_i32`
+软件模拟（处理符号/除零/精化），但目前没接到任何 tdivs/tdiv 模板上。
+
+**受影响 kernel（已确认，全部是 i32 tdivs）**：`merge_norm`、`rope_cs`、
+`rmsnorm_rope`、`route_hash`、`rope`、`prefill_c4_rmsnorm_rope`、
+`prefill_idx_c4_rmsnorm_rope`、`prefill_hca_c128_rmsnorm_rope` 等。用例都是
+索引算术（`gather_lin2d / cols → 行号`），C 截断整除语义。
+`qr_rms_norm_quant`/`ffn_norm` 用的是 `pto.tdiv`（tile-tile）且 dtype=f32，
+**不是** i32 tdivs 问题——见下方 tstore 变体。
 
 另一个变体：`ffn_norm` 命中 `pto.tstore` 的 NoMatchingTemplate（6 个候选
 模板的 custom constraints 不满足）。
 
-### 修复方案
+### 修复方案（已实施）
 
-路由到 **ptoas**。两个方向：
+**文件**：`PTOAS/ptodsl/ptodsl/tilelib/templates/a5/tdivs.py`
 
-1. **加模板**：在 ptoas 的 A5 模板库里给 `tdivs` 加 i32 dtype 签名。
-2. **在 pypto 侧 lowering**：让 pypto 把 i32 `tdivs` lower 成 fp32 除法 +
-   cast，绕过模板缺口。
+1. `_DTYPES` 加 `("i32","i32","i32")`（只加 i32——扫描确认 pypto 对 tdivs
+   只发 i32，不发 ui32/i16/ui16；避免无符号转换的正确性问题）。
+2. 新增 `_div_i32()`：`vcvt(i32→f32, R)` → `vdiv` → `vcvt(f32→i32, Z, NOSAT)`，
+   1:1 lane 映射，照搬 `tcolexpanddiv._divide_i32` 的写法。
+3. `_div()` 加 i32 分支，并把 high-precision 路径显式限定为 float-only
+   （防止 i32 op 误带 `precisionType=high_precision` 时崩）。
+4. VMI 模板（`vmi_tdivs`/`vmi_tdivs_scalar_tile`）保持 f32-only——VMI 融合
+   是浮点专属；非 VMI 的 i32 走新加的标量模板。
 
-**VMI 路线的发现**：开 `--enable-vmi` 后，`merge_norm`（decode）的 tdivs
-被 VMI 融合掉 → 不再触发模板缺失 → PASS。但其他 kernel 的 tdivs 不在
-融合区域里，仍崩溃。所以 VMI 不能替代模板修复。
+`tdiv.py`（tile-tile）不改——扫描确认 pypto 对 `pto.tdiv` 只发 f32，
+i32 tile-tile 除法不是真实用例。
 
-**验证**：加模板后 `merge_norm`（baseline 路线）应能编译通过。
+**同步**：改的是 `ptodsl/` 源树（daemon 的 PYTHONPATH 指向源树，直接生效）；
+为保险把 `install311/`、`install/`、`build311/python/` 三个安装副本也同步
+了，并清了 `__pycache__`。
+
+**验证**：
+- `ptodsl/tests/test_tilelib_catalog.py` 新增 `test_tdivs_i32_routes_through_fp32_divide`，
+  断言 i32 两个候选模板都生成 `vcvt`+`vdiv`。PASS（含全量 catalog sweep
+  `test_each_catalog_entry_selects_and_renders`）。
+- 端到端复现：`merge_norm`（baseline 路线）的 `NoMatchingTemplate` 消失，
+  ptoas→bisheng 全过，到了 NPU run 才因 `v2.bin` 缺失（C2/C3 框架问题）停。
+  `rope_cs` 同样：tdivs lowering 过了，停在 `v3.bin`（C2/C3）。
+
+**剩余**：`ffn_norm` 的 `tstore` NoMatchingTemplate 是**另一个根因**
+（`_check_store_bounds` 形状约束，非 dtype 缺口），不在此修，需单独跟进。
 
 ---
 
@@ -495,22 +533,35 @@ PTO_TO_CPP = {"f32": "float", "bf16": "bfloat16_t", "f16": "half",
 `exp_up_mm`、`sh_w2_mm`、`exp_w2_mm`、`x_norm_quant` 等所有含
 `!pto.ptr<i8>` 的 kernel。
 
-### 修复方案
+### 修复方案（已实施）
 
-路由到 **测试框架**。一行修复：
+路由到 **测试框架**。
+
+**文件**：`.claude/skills/vpto-board-validate/lib/pto_parse.py`
+
+两处映射都补齐了 `i8`/`u8`（`PTO_TO_CPP` 和 `pto_type_to_c` 的 `mapping`
+字典都要加——后者决定 `launch.cpp` 的 `__gm__` 指针类型，不加的话 host
+类型仍是裸 `i8`，bisheng 同样不认）：
 
 ```python
-# pto_parse.py:183 修复：
+# PTO_TO_CPP：
 PTO_TO_CPP = {"f32": "float", "bf16": "bfloat16_t", "f16": "half",
               "i32": "int32_t", "i64": "int64_t", "i16": "int16_t",
               "i8": "int8_t", "u8": "uint8_t",   # ← 新增
               "index": "int64_t"}
+
+# pto_type_to_c 的 mapping：
+"i8": ("int8_t", "__gm__ int8_t*"),
+"u8": ("uint8_t", "__gm__ uint8_t*"),
 ```
 
-同时检查 `_DTYPE_TO_NP`（capture.py）是否也需要加 `INT8`/`UINT8` 的映射。
+`capture.py` 的 `_DTYPE_TO_NP` 已有 `"INT8": "int8"`——dump 里 dtype 字符串
+是 `INT8`/`INT32`/`INT64`/`FLOAT32`/`BFLOAT16`，全部已映射，无需改动。
 
-**验证**：修完后 `quant` 的 `launch.cpp` 应生成 `int8_t*` 而非 `i8*`，
-bisheng 编译通过。
+**验证**：`pto_type_to_c("i8")` 现在返回 `("int8_t", "__gm__ int8_t*")`，
+`pto_type_to_c("u8")` 返回 `("uint8_t", "__gm__ uint8_t*")`。`quant` 的
+`launch.cpp` 将生成 `__gm__ int8_t* v2` 而非 `__gm__ i8* v2`，bisheng
+不再报 `unknown type name 'i8'`。
 
 ---
 
@@ -534,18 +585,61 @@ cat build_output/_jit_attention_hca_test_*/report/codegen_errors.txt
 **根因**：pypto 生成的 `build_valid.pto:27:3` 有一个 SSA 值在定义前被使用。
 路由到 **pypto**。
 
-### C7b — `_aic`/`_aiv` split kernel 找不到 .pto
+### C7b — `_aic`/`_aiv` split kernel 总是被解析/编译成 `_aic` 半
 
 **受影响**：`qk_pv_aic`、`qk_pv_aiv`、`gate_aic`、`gate_aiv`、
 `mtp_projection_linear_aic`、`mtp_projection_linear_aiv`
 
-**根因**：这些 kernel 在运行时被 split 成 AIC + AIV 两个编译产物，
-但 capture dump 的 `name_map` 不产生 `*_aic`/`*_aiv` 的独立条目。
-harvest 按 name 查找 → 找不到 → 无 .pto。
+**根因**：`name_map` 里确实有 `*_aic`/`*_aiv` 各自的 callable_id
+（不是"找不到 .pto"），`validate.py` 的前缀匹配也能找到共享的
+`qk_pv.pto` / `mtp_projection_linear.pto`。真正的 bug 是：**这些
+.pto 文件里有两个 `func.func`**（`@qk_pv_aic` cube + `@qk_pv_aiv` vector，
+签名相同），而框架的三个函数都按"整个文件"操作，导致 `_aiv` 被当成 `_aic`：
 
-**修复方案**：路由到 **测试框架**。`capture.py` 或 `validate.py` 需要识别
-`*_aic`/`*_aiv` 后缀，映射回原始 kernel name 的 .pto（可能是同一个 .pto
-的两个 symbol，或需要分开编译）。
+1. `pto_parse.parse_pto` 用 `re.search(r'func\.func\s+@(\w+)\((.*?)\)', text)`
+   只抓**第一个** func —— 无论 `--kernel` 传的是 `qk_pv_aic` 还是
+   `qk_pv_aiv`，`info["func_name"]` 永远是 `qk_pv_aic`。
+2. `setup_vpto.detect_kernel_kind` 对整文件 grep "cube" —— `_aiv` 半
+   因为文件里存在 `_aic` 的 cube 属性，被误判为 cube。
+3. `setup_vpto.preprocess_pto` 的 func-attr `replace` 是全文件替换 ——
+   给 `_aic` 和 `_aiv` 两个 func 都打了 `pto.kernel` attr，ptoas 会
+   生成两个 symbol，但 `launch.cpp` 的 `extern` 声明只匹配第一个。
+
+```bash
+# 验证 split .pto 有两个 func.func：
+grep "func.func @" build_output/_jit_attention_csa_test_*/ptoas/qk_pv.pto
+# func.func @qk_pv_aic(...) attributes {pto.kernel_kind = #pto.kernel_kind<cube>} {
+# func.func @qk_pv_aiv(...) attributes {pto.kernel_kind = #pto.kernel_kind<vector>} {
+```
+
+### 修复方案（已实施）
+
+路由到 **测试框架**。三个函数都加 `kernel: str | None = None` 参数，
+当指定 kernel 时按 func 名锚定，只操作目标 func：
+
+- `pto_parse.parse_pto(pto_path, kernel)`：正则锚定
+  `func.func @<kernel>(...)`，解析正确的半。
+- `setup_vpto.detect_kernel_kind(pto_text, kernel)`：把"cube" 搜索范围
+  缩到 `func.func @<kernel>` 的 body（到下一个 `func.func`/`}` 为止），
+  不再因为文件里有 `_aic` 就把 `_aiv` 误判成 cube。
+- `setup_vpto.preprocess_pto(..., kernel)`：func-attr 编辑改成用
+  `re.sub(count=1)` 只在 `func.func @<kernel>` 的 `attributes {` 里插入
+  `pto.kernel`，另一半不打 attr → ptoas 只生成目标 symbol。
+
+`vpto_run.py` 三处调用点传入 `kernel`（`args.kernel or args.pto.stem`，
+line 331 已解析）。
+
+**验证**（`mtp_projection_linear.pto`，含 `_aic` cube + `_aiv` vector）：
+```
+parse_pto(pto)                          func_name=mtp_projection_linear_aic  (第一个)
+parse_pto(pto, 'mtp_projection_linear_aic')  func_name=mtp_projection_linear_aic
+parse_pto(pto, 'mtp_projection_linear_aiv')  func_name=mtp_projection_linear_aiv  ✓
+detect_kernel_kind(text, '_aic') → cube
+detect_kernel_kind(text, '_aiv') → vector  ✓  (修前两个都是 cube)
+preprocess_pto(..., '_aiv') → pto.kernel 只插入到 _aiv 的 attributes，_aic 不动 ✓
+```
+
+**C7a（SSA dominance）**仍在 **pypto** 侧，不在本仓库修。
 
 ---
 
@@ -568,9 +662,45 @@ harvest 按 name 查找 → 找不到 → 无 .pto。
 
 ### 修复方案
 
-- C8a：修 C2 自动修复。
-- C8b：路由到 **测试框架 + 测试输入**。框架应把这类 kernel 标记为
-  "not-exercised"（而非 "crash"），并需要换一个能触发该分支的测试输入。
+- C8a：修 C2 自动修复。✅（commit `dcc5568`）
+- C8b：路由到 **测试框架**。✅（已实施）
+
+#### C8b 实施
+
+**文件**：`tests/dsv4_validate/capture.py`、`tests/dsv4_validate/validate.py`
+
+`capture.harvest_kernel` 在"no dump records"时不再抛 `RuntimeError`，
+改抛一个专门的 `NotExercised` 异常（`capture.py` 顶层定义）：
+
+```python
+class NotExercised(Exception):
+    """Kernel branch not triggered by the test input (0-iter SPMD, no task)."""
+
+# harvest_kernel:
+if not all_indices:
+    raise NotExercised(
+        f"kernel {kernel!r} (fid {target_fid}) produced no dump records — "
+        f"its branch was not triggered by the test input (0-iter SPMD)")
+```
+
+`validate.run_phase5_module` 的 harvest try/except 增加 `NotExercised`
+分支（必须在通用 `except Exception` **之前**），用
+`compare_status="not-exercised"` 记录：
+
+```python
+except _capture.NotExercised as e:
+    results.append(_phase5_error_row(
+        module, model_py, mode, device, kname,
+        f"not-exercised: {e}", route=route,
+        compare_status="not-exercised"))
+    continue
+```
+
+`_phase5_error_row` 加 `compare_status: str = "crash"` 形参（向后兼容）。
+
+**验证**：`--module hc_post --mode prefill` 时 `hc_post_inactive_pad`
+在 `sweep_results.csv` 里会记 `compare_status=not-exercised` 而非
+`crash`。要真正跑通它仍需换一个能触发该分支的测试输入（不在框架侧）。
 
 ---
 
@@ -624,14 +754,16 @@ VMI 代码生成 bug。
 
 | 优先级 | 修复项 | 责任层 | 预期转化 | 难度 |
 |---|---|---|---|---|
-| **P0** | C6: 加 i8→int8_t 映射 | 框架 | ~30 crash→pass/fail | 1 行 |
-| **P0** | C2: 加 inout harvest 分支 | 框架 | ~50 crash→pass/fail | 5 行 |
-| **P1** | C3: 从 .pto 推导 scalar 语义 | 框架 | ~45 crash + 3 精度 | 中等 |
-| **P1** | C4: 跳过 0 字节 alloc | 框架 | ~30 crash→pass/fail | 简单 |
-| **P2** | C5: 加 A5 tdivs i32 template | ptoas | ~80 crash→pass/fail | 需 ptoas 侧 |
+| **P0** | C6: 加 i8→int8_t 映射 | 框架 | ~30 crash→pass/fail | ✅ 已实施（`pto_parse.py`） |
+| **P0** | C2: 加 inout harvest 分支 | 框架 | ~50 crash→pass/fail | ✅ 已实施（commit `dcc5568`） |
+| **P1** | C3: 从 .pto 推导 scalar 语义 | 框架 | ~45 crash + 3 精度 | ✅ 已实施（`derive_scalar_values`，commit `aefe714`） |
+| **P1** | C4: 跳过 0 字节 alloc | 框架 | ~30 crash→pass/fail | 简单（未实施） |
+| **P2** | C5: 加 A5 tdivs i32 template | ptoas | ~80 crash→pass/fail | ✅ 已实施（fp32 绕行） |
 | **P2** | C1a: 修 inner-kernel 硬编码形状 | pypto | 5 精度 FAIL→pass | 需 pypto 侧 |
 | **P3** | VMI-UB: 修 VMI UB 对齐 | ptoas | 13 回归→pass | 需 ptoas 侧 |
-| **P3** | C7: SSA + aic/aiv split | pypto+框架 | ~6 crash | 中等 |
-| **P3** | C8b: 0-iter SPMD 标记 | 框架 | 2 crash→skip | 简单 |
+| **P3** | C7a: SSA dominance | pypto | 部分 crash | 需 pypto 侧 |
+| **P3** | C7b: aic/aiv split 按 func 锚定 | 框架 | ~6 crash | ✅ 已实施（`pto_parse`/`setup_vpto`/`vpto_run`） |
+| **P3** | C8b: 0-iter SPMD 标记 | 框架 | 2 crash→skip | ✅ 已实施（`NotExercised`） |
 
-**修完 P0+P1（框架侧，~4 处修改）可转化 ~155 行**（54% 的失败）。
+**框架侧已修完 C2/C3/C6/C7b/C8b**。剩余框架项仅 C4（0 字节 alloc）。
+pypto 侧剩 C1a/C7a，ptoas 侧剩 VMI-UB。

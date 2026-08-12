@@ -255,6 +255,14 @@ def run_phase5_module(module: str, model_py: Path, mode: str, device: int,
             meta = _capture.harvest_kernel(dump_wd, dump_wd, kname, run_dir, pto)
             (run_dir / "capture_meta.json").write_text(
                 json.dumps(meta, indent=2), encoding="utf-8")
+        except _capture.NotExercised as e:
+            # 0-iter SPMD: the kernel's branch was never triggered under the
+            # current test input. Report as "not-exercised" (not a crash).
+            results.append(_phase5_error_row(
+                module, model_py, mode, device, kname,
+                f"not-exercised: {e}", route=route,
+                compare_status="not-exercised"))
+            continue
         except Exception as e:  # noqa: BLE001
             results.append(_phase5_error_row(
                 module, model_py, mode, device, kname,
@@ -313,13 +321,14 @@ def run_phase5_module(module: str, model_py: Path, mode: str, device: int,
 
 
 def _phase5_error_row(module: str, model_py: Path, mode: str, device: int,
-                      kernel: str, error: str, route: str = "baseline") -> dict:
+                      kernel: str, error: str, route: str = "baseline",
+                      compare_status: str = "crash") -> dict:
     out = {f: "" for f in RESULT_FIELDS}
     out.update({
         "kernel": kernel, "module": module,
         "route": _route_label(route, phase5=True),
         "mode": mode, "device": device, "pass": False,
-        "compare_status": "crash", "exit_code": -1, "error": error,
+        "compare_status": compare_status, "exit_code": -1, "error": error,
     })
     return out
 
