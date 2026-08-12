@@ -123,9 +123,12 @@ def harvest_kernel(dump_dir: Path, work_dir: Path, kernel: str,
 
     vN is numbered by the kernel's ptr-arg order (arg_index 0 -> v1, ...).
     Inputs (role=input, before_dispatch) become vN.bin; outputs
-    (role=output, after_completion) become golden_vN.bin. When a ptr is
-    both (inout) or is an output-only ptr (no input record), vN.bin is
-    zero-filled so main.cpp can read it; golden_vN.bin carries the reference.
+    (role=output, after_completion) become golden_vN.bin. An inout ptr
+    (role=inout) has both a before_dispatch and an after_completion
+    snapshot: the before snapshot becomes vN.bin (the kernel's real input)
+    and the after snapshot becomes golden_vN.bin. An output-only ptr (no
+    input record) gets a zero-filled vN.bin so main.cpp can read it;
+    golden_vN.bin carries the reference.
     Returns a meta dict {outputs, np_types, elem_counts} for main.cpp.
     """
     args_dump_dir = dump_dir / "dfx_outputs" / "args_dump"
@@ -152,10 +155,14 @@ def harvest_kernel(dump_dir: Path, work_dir: Path, kernel: str,
         if target_fid not in a["func_id"]:
             continue
         ai = a["arg_index"]
-        if a["role"] == "input" and a["stage"] == "before_dispatch":
+        # inout ptrs carry both an input snapshot (before_dispatch) and an
+        # output snapshot (after_completion) for the same GM buffer, so treat
+        # inout as both input and output — otherwise the arg is dropped and
+        # vN.bin is never written, breaking main.cpp's ReadFile3.
+        if a["role"] in ("input", "inout") and a["stage"] == "before_dispatch":
             if ai not in inputs:
                 inputs[ai] = a
-        elif a["role"] == "output" and a["stage"] == "after_completion":
+        if a["role"] in ("output", "inout") and a["stage"] == "after_completion":
             if ai not in outputs:
                 outputs[ai] = a
 
