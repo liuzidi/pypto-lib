@@ -58,7 +58,7 @@ from pathlib import Path
 # Make the vendored lib importable when run as a script.
 _SKILL_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(_SKILL_DIR))
-from lib.pto_parse import parse_pto, get_outputs_from_golden_lib, get_golden_constants, get_scalar_semantic_names  # noqa: E402
+from lib.pto_parse import parse_pto, derive_scalar_values, get_outputs_from_golden_lib, get_golden_constants, get_scalar_semantic_names  # noqa: E402
 from lib import setup_vpto, setup_main  # noqa: E402
 from lib import run_jit_golden  # noqa: E402
 
@@ -376,12 +376,12 @@ def main() -> int:
                     cann_env.setdefault(k, v)
 
     # --- parse .pto + golden metadata (mode-specific) ---
-    info = parse_pto(args.pto)
+    info = parse_pto(args.pto, kernel)
     if not info["func_name"]:
         print(f"[vpto_run] ERROR: cannot parse .pto: {args.pto}", file=sys.stderr)
         return 2
     pto_text = args.pto.read_text(encoding="utf-8")
-    kind = setup_vpto.detect_kernel_kind(pto_text)
+    kind = setup_vpto.detect_kernel_kind(pto_text, kernel)
 
     use_model_py = args.model_py is not None
     use_captured = args.captured_dump is not None
@@ -399,6 +399,18 @@ def main() -> int:
         cmeta = _json.loads(meta_path.read_text(encoding="utf-8"))
         outputs = cmeta["outputs"]
         consts = {}
+        # Resolve each index scalar's value in priority order:
+        #   1. derived  — scalar controls a tensor-view dim → elem_count //
+        #      product(other static dims). Exact, preferred.
+        #   2. dumped  — runtime value captured in args_dump.json (for scalars
+        #      not derivable from shapes, e.g. partition_view offsets such as
+        #      mtp_projection_rms %arg4). Written to capture_meta.json by
+        #      harvest_kernel as scalar_values {vN: int}.
+        #   3. ctx_len — the trailing index = dynamic T dim (B*S); legacy
+        #      heuristic for the one scalar shapes/dump can't resolve.
+        #   4. None    — setup_main emits =0 // FIXME (SPMD block_num=1 etc).
+        derived = derive_scalar_values(info, cmeta["elem_counts"])
+        dumped = cmeta.get("scalar_values", {}) or {}
         scalar_sem = []
         ctx_marked = False
         # ctx_len still needed for the trailing index scalar; read from config.
@@ -406,12 +418,17 @@ def main() -> int:
         for p in info["params"]:
             if p["pto_type"] in ("i32", "index"):
                 sig = p.get("sig_name", "") or p["name"]
-                if not ctx_marked and "spmd" not in sig:
+                if p["name"] in derived:
+                    scalar_sem.append("derived")
+                elif p["name"] in dumped:
+                    scalar_sem.append("dumped")
+                elif not ctx_marked and "spmd" not in sig:
                     scalar_sem.append("ctx_len")
                     ctx_marked = True
                 else:
                     scalar_sem.append(None)
-        load_vals = {"ctx_len": ctx_len, "ctx_blocks": None}
+        load_vals = {"ctx_len": ctx_len, "ctx_blocks": None,
+                     "derived": derived, "dumped": dumped}
         golden_np_types = cmeta["np_types"]
         # elem_counts_override: captured numel per vN (from the dump shapes)
         elem_counts_override = cmeta["elem_counts"]
@@ -423,22 +440,27 @@ def main() -> int:
         outputs = model_meta["outputs"]
         consts = {}
         # DSV4 .pto kernels take a trailing `index` arg = the dynamic T dim
-        # (T_DYN = B*S). setup_main fills it from load_vals["ctx_len"] when
-        # the scalar's semantic is "ctx_len" — so build scalar_sem marking the
-        # first non-spmd index/i32 scalar as ctx_len. (spmd args keep the
-        # setup_main SPMD special-case: block_num=1, block_idx=0.)
+        # (T_DYN = B*S). When a scalar can be derived from a tensor-view shape
+        # (e.g. mtp_projection_rms's row/col counts), prefer that exact value
+        # over the ctx_len heuristic. Remaining non-spmd scalars fall back to
+        # the first=ctx_len heuristic; spmd args keep the setup_main
+        # special-case (block_num=1, block_idx=0).
+        derived = derive_scalar_values(info, model_meta.get("elem_counts"))
         scalar_sem = []
         ctx_marked = False
         for p in info["params"]:
             if p["pto_type"] in ("i32", "index"):
                 sig = p.get("sig_name", "") or p["name"]
-                if not ctx_marked and "spmd" not in sig:
+                if p["name"] in derived:
+                    scalar_sem.append("derived")
+                elif not ctx_marked and "spmd" not in sig:
                     scalar_sem.append("ctx_len")
                     ctx_marked = True
                 else:
                     scalar_sem.append(None)
         load_vals = {"ctx_len": model_meta["ctx_len"],
-                     "ctx_blocks": model_meta.get("ctx_blocks")}
+                     "ctx_blocks": model_meta.get("ctx_blocks"),
+                     "derived": derived}
         golden_np_types = model_meta["np_types"]
         elem_counts_override = model_meta.get("elem_counts")
     else:
@@ -513,7 +535,7 @@ if __name__ == "__main__":
 
     # --- 3. sed-preprocess .pto -> build/<kernel>.pto ---
     pto_file = build_root / f"{kernel}.pto"
-    setup_vpto.preprocess_pto(args.pto, pto_file, kind)
+    setup_vpto.preprocess_pto(args.pto, pto_file, kind, kernel)
 
     # --- 4. ptoas VPTO -> fatobj ---
     fatobj = build_root / f"{kernel}.o"

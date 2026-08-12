@@ -28,6 +28,7 @@ Usage (typically called by validate.py, not directly):
 import argparse
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -35,7 +36,16 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 VPTO_ENV_SH = REPO_ROOT / "scripts" / "vpto_env.sh"
-PTOAS_ROOT = Path("/data/liuzidi/PTOAS/build311/tools/ptoas")
+# PTOAS_ROOT comes from the environment: validate.py exports it (resolved from
+# vpto_env.sh's PTOAS_BIN) before launching this script as a subprocess. Fall
+# back to PTOAS_BIN's parent dir if only that var is set. No hardcoded paths.
+_ptoas_env = os.environ.get("PTOAS_ROOT") or os.environ.get("PTOAS_BIN")
+if _ptoas_env:
+    PTOAS_ROOT = Path(_ptoas_env)
+    if "PTOAS_BIN" in os.environ and "PTOAS_ROOT" not in os.environ:
+        PTOAS_ROOT = PTOAS_ROOT.parent  # PTOAS_BIN points at the binary; parent is the tool dir
+else:
+    PTOAS_ROOT = None  # type: ignore[assignment]
 
 
 def _load_module(model_py: Path):
@@ -117,6 +127,16 @@ _DTYPE_TO_NP = {
 }
 
 
+class NotExercised(Exception):
+    """Kernel branch not triggered by the test input.
+
+    Raised by harvest_kernel when the kernel appears in name_map but has zero
+    dump records (no task in deps.json dispatched it — e.g. a dead-branch
+    inactive-pad kernel under prefill). Distinct from a crash: the framework
+    should record this as "not-exercised" rather than "crash".
+    """
+
+
 def harvest_kernel(dump_dir: Path, work_dir: Path, kernel: str,
                    run_dir: Path, pto_path: Path) -> dict:
     """Read args_dump for one kernel; write vN.bin / golden_vN.bin into run_dir.
@@ -148,13 +168,19 @@ def harvest_kernel(dump_dir: Path, work_dir: Path, kernel: str,
         raise RuntimeError(f"kernel {kernel!r} not in name_map {cid2name}")
 
     args = manifest["args"]
-    # group by arg_index, take first record of each (copies are identical)
+    # group by arg_index, take first record of each (copies are identical).
+    # Pick the task_id of the first input/output record so the scalar values
+    # captured below come from the same task instance as the tensor data.
     inputs: dict[int, dict] = {}
     outputs: dict[int, dict] = {}
+    scalar_vals: dict[int, int] = {}
+    harvest_task_id = None
     for a in args:
         if target_fid not in a["func_id"]:
             continue
         ai = a["arg_index"]
+        if harvest_task_id is None and a.get("role") in ("input", "output", "inout"):
+            harvest_task_id = a.get("task_id")
         # inout ptrs carry both an input snapshot (before_dispatch) and an
         # output snapshot (after_completion) for the same GM buffer, so treat
         # inout as both input and output — otherwise the arg is dropped and
@@ -165,10 +191,31 @@ def harvest_kernel(dump_dir: Path, work_dir: Path, kernel: str,
         if a["role"] in ("output", "inout") and a["stage"] == "after_completion":
             if ai not in outputs:
                 outputs[ai] = a
+    # capture scalar records (kind=="scalar") from the same task as the
+    # harvested tensors. These carry the runtime value of index/i32 scalars
+    # that cannot be recovered from tensor-view shapes (e.g. partition_view
+    # offsets like mtp_projection_rms %arg4). Written to capture_meta.json as
+    # scalar_values {vN: int} so vpto_run.py can fill them in main.cpp.
+    for a in args:
+        if target_fid not in a["func_id"]:
+            continue
+        if a.get("kind") != "scalar":
+            continue
+        if harvest_task_id is not None and a.get("task_id") != harvest_task_id:
+            continue
+        ai = a["arg_index"]
+        if ai not in scalar_vals and a.get("value") is not None:
+            scalar_vals[ai] = int(a["value"])
 
     all_indices = sorted(set(inputs) | set(outputs))
     if not all_indices:
-        raise RuntimeError(f"no dump records for kernel {kernel} (fid {target_fid})")
+        # The kernel is in name_map but produced no dump records — its branch
+        # was never dispatched under the current test input (0-iter SPMD).
+        # Surface this distinctly so the sweep reports "not-exercised" rather
+        # than "crash" (see validate.py run_phase5_module).
+        raise NotExercised(
+            f"kernel {kernel!r} (fid {target_fid}) produced no dump records — "
+            f"its branch was not triggered by the test input (0-iter SPMD)")
 
     bin_path = args_dump_dir / manifest.get("bin_file", "args.bin")
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -204,6 +251,7 @@ def harvest_kernel(dump_dir: Path, work_dir: Path, kernel: str,
         "outputs": out_names,
         "np_types": np_types,
         "elem_counts": elem_counts,
+        "scalar_values": {f"v{ai + 1}": v for ai, v in sorted(scalar_vals.items())},
         "func_id": target_fid,
         "n_inputs": len(inputs),
         "n_outputs": len(outputs),

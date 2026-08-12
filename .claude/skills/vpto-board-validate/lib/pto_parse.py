@@ -16,6 +16,7 @@ from pathlib import Path
 
 __all__ = [
     "parse_pto",
+    "derive_scalar_values",
     "pto_type_to_c",
     "parse_cpp",
     "split_cpp_args",
@@ -28,21 +29,43 @@ __all__ = [
 ]
 
 
-def parse_pto(pto_path: Path) -> dict:
-    """Extract from a .pto file: func_name, params, dims, elem_counts.
+def parse_pto(pto_path: Path, kernel: str | None = None) -> dict:
+    """Extract from a .pto file: func_name, params, dims, elem_counts,
+    scalar_dims.
 
     Each param is {"name": "vN", "pto_type": <dtype>, "arg": "%argN"}.
     elem_counts is derived from pto.make_tensor_view shapes that reference
     static %cN_index constants; dynamic (non-constant) shapes are skipped.
+    scalar_dims maps each index scalar's %argN to the list of tensor params
+    whose make_tensor_view shape mentions it: [("v1", [other_static_dim_sizes])].
+    Used by derive_scalar_values() to recover an index scalar's value from
+    a tensor's elem_count when it controls a single dynamic tensor dimension.
+
+    `kernel` selects which func.func to parse in a multi-func .pto. Split
+    kernels (e.g. qk_pv_aic + qk_pv_aiv) live in one .pto as two func.func
+    blocks with the same ptr/scalar signature. Without `kernel`, the first
+    func.func in the file is parsed (backward compat for single-func .pto).
     """
     text = pto_path.read_text(encoding="utf-8")
-    info = {"func_name": "", "params": [], "dims": {}, "elem_counts": {}}
+    info = {"func_name": "", "params": [], "dims": {}, "elem_counts": {},
+            "scalar_dims": {}}
 
-    m = re.search(r'func\.func\s+@(\w+)\((.*?)\)', text)
-    if not m:
-        return info
-    info["func_name"] = m.group(1)
-    raw_params = m.group(2)
+    # Anchor on the specific kernel func when requested so a split .pto's
+    # second half (e.g. qk_pv_aiv) is not mis-parsed as the first (qk_pv_aic).
+    if kernel:
+        m = re.search(
+            rf'func\.func\s+@{re.escape(kernel)}\((.*?)\)', text)
+        if not m:
+            return info
+        func_name = kernel
+        raw_params = m.group(1)
+    else:
+        m = re.search(r'func\.func\s+@(\w+)\((.*?)\)', text)
+        if not m:
+            return info
+        func_name = m.group(1)
+        raw_params = m.group(2)
+    info["func_name"] = func_name
 
     pt = re.findall(r'%\w+:\s*!pto\.ptr<(\w+)>', raw_params)
     # tensor-view name per ptr: from "%<view>__ssa_vN_view = pto.make_tensor_view %argM"
@@ -92,6 +115,7 @@ def parse_pto(pto_path: Path) -> dict:
         if not m2:
             continue
         shapes = [s.strip() for s in m2.group(1).split(',')]
+        # Static elem_count: product when every dim is a %cN_index constant.
         ec = 1
         ok = True
         for s in shapes:
@@ -102,7 +126,65 @@ def parse_pto(pto_path: Path) -> dict:
             ec *= v
         if ok:
             info["elem_counts"][p["name"]] = ec
+        # Dynamic dims: record each %argN-shaped dimension so its value can be
+        # recovered later from this tensor's elem_count (total / product of the
+        # other static dims). A scalar may appear in multiple tensors' shapes;
+        # collect all of them so derive_scalar_values can cross-check.
+        for s in shapes:
+            if re.fullmatch(r'%arg\d+', s):
+                other = [info["dims"][x] for x in shapes if x != s]
+                info["scalar_dims"].setdefault(s, []).append(
+                    (p["name"], other))
     return info
+
+
+def derive_scalar_values(info: dict, elem_counts: dict | None = None) -> dict:
+    """Derive each index scalar's runtime value from tensor-view shapes.
+
+    For each index scalar %argN that appears in at least one
+    `pto.make_tensor_view shape=[...]`, recover its value as
+    `elem_count[ptr_name] // product(other_static_dim_sizes)`, where the
+    other dims are the static %cN_index dims of that tensor. If the scalar
+    appears in multiple tensors, require them to agree; on disagreement (or a
+    missing elem_count, or a non-clean division) skip that scalar so it falls
+    back to the setup_main `= 0; // FIXME` path rather than emitting a wrong
+    value.
+
+    Returns {scalar_param_name ("v6"): int_value} for the derivable scalars.
+    Scalars with no shape occurrence (e.g. partition_view offsets, loop
+    bounds) are absent — they are not derivable from shapes alone.
+    """
+    ec = dict(info.get("elem_counts", {}))
+    if elem_counts:
+        ec.update(elem_counts)
+    # Map %argN -> scalar param name (vN) in .pto signature order.
+    arg_to_name = {p["arg"]: p["name"] for p in info["params"]
+                   if p["pto_type"] in ("i32", "index")}
+    out: dict[str, int] = {}
+    for scalar_arg, occurrences in info.get("scalar_dims", {}).items():
+        name = arg_to_name.get(scalar_arg)
+        if not name:
+            continue
+        resolved: int | None = None
+        consistent = True
+        for ptr_name, other_dims in occurrences:
+            total = ec.get(ptr_name)
+            if total is None:
+                continue
+            denom = 1
+            for d in other_dims:
+                denom *= d
+            if denom == 0 or total % denom != 0:
+                continue
+            cand = total // denom
+            if resolved is None:
+                resolved = cand
+            elif resolved != cand:
+                consistent = False
+                break
+        if resolved is not None and consistent:
+            out[name] = resolved
+    return out
 
 
 def pto_type_to_c(pto_type: str) -> tuple:
@@ -114,6 +196,10 @@ def pto_type_to_c(pto_type: str) -> tuple:
         "i32": ("int32_t", "__gm__ int32_t*"),
         "i64": ("int64_t", "__gm__ int64_t*"),
         "i16": ("int16_t", "__gm__ int16_t*"),
+        # i8/u8: quantized weights and int8 outputs. Without this, bisheng
+        # rejects the raw `i8` token ("unknown type name 'i8'") in launch.cpp.
+        "i8": ("int8_t", "__gm__ int8_t*"),
+        "u8": ("uint8_t", "__gm__ uint8_t*"),
     }
     if pto_type == "i32":
         return ("int32_t", "int32_t")
@@ -182,6 +268,7 @@ def parse_cpp(cpp_path: Path) -> dict:
 
 PTO_TO_CPP = {"f32": "float", "bf16": "bfloat16_t", "f16": "half",
               "i32": "int32_t", "i64": "int64_t", "i16": "int16_t",
+              "i8": "int8_t", "u8": "uint8_t",
               "index": "int64_t"}
 
 
@@ -281,6 +368,10 @@ def compute_scalar_comment(sem_name: str, consts: dict,
              if load_vals and load_vals.get("ctx_len") is not None
              else consts.get("MAX_SEQ", "?"))
         return f"ctx_len: 总序列长度 = {v}"
+    elif sem_name == "derived":
+        return "derived: 从 .pto tensor-view shape 推导的张量维大小"
+    elif sem_name == "dumped":
+        return "dumped: 从 args_dump.json 捕获的运行时 scalar 值"
     elif sem_name == "pair_index":
         return "pair_index: KV head pair索引, 范围 0..NUM_KV_HEADS-1, 建议 0"
     elif sem_name == "block_base":

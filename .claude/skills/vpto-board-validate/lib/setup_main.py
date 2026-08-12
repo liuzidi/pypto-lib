@@ -170,6 +170,20 @@ def gen_main_cpp(info: dict, outputs: list, load_vals: dict | None = None,
             param_decls.append(f"    {scal_type} {s['name']} = {load_vals['ctx_len']};  // {hint}")
         elif sem == "ctx_blocks" and load_vals.get("ctx_blocks") is not None:
             param_decls.append(f"    {scal_type} {s['name']} = {load_vals['ctx_blocks']};  // {hint}")
+        elif sem == "derived" and s["name"] in (load_vals.get("derived") or {}):
+            # Value recovered from a .pto tensor-view shape: the scalar
+            # controls a single dynamic tensor dimension, so its value =
+            # elem_count // product(other static dims). See
+            # pto_parse.derive_scalar_values.
+            v = load_vals["derived"][s["name"]]
+            param_decls.append(f"    {scal_type} {s['name']} = {v};  // {hint}")
+        elif sem == "dumped" and s["name"] in (load_vals.get("dumped") or {}):
+            # Runtime value captured in args_dump.json (the scalar's `value`
+            # field from the Route-1 dump, written to capture_meta.json by
+            # harvest_kernel). Used for scalars not derivable from shapes,
+            # e.g. partition_view offsets such as mtp_projection_rms %arg4.
+            v = load_vals["dumped"][s["name"]]
+            param_decls.append(f"    {scal_type} {s['name']} = {v};  // {hint}")
         else:
             # SPMD block_num must be 1 for a single-block launch (0 means "no
             # blocks" → the kernel body never runs → all-zero output). block_idx

@@ -19,6 +19,7 @@ backend. Do NOT turn fusion off — that yields an empty ctor-only fatobj.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 from .pto_parse import parse_pto, pto_type_to_c
@@ -71,12 +72,27 @@ struct MrgSortExecutedNumList {
 """
 
 
-def detect_kernel_kind(pto_text: str) -> str:
-    """Return 'cube' or 'vector' by grepping the .pto's kernel_kind attribute."""
-    return "cube" if "kernel_kind" in pto_text and "cube" in pto_text else "vector"
+def detect_kernel_kind(pto_text: str, kernel: str | None = None) -> str:
+    """Return 'cube' or 'vector' for the target kernel.
+
+    Without `kernel`, greps the whole .pto for a `kernel_kind` mentioning cube
+    (single-func .pto case). With `kernel`, narrows the search to that
+    func.func's body — a split .pto (qk_pv_aic cube + qk_pv_aiv vector) must
+    not report cube for the vector half just because the cube half mentions it.
+    """
+    if not kernel:
+        return "cube" if "kernel_kind" in pto_text and "cube" in pto_text else "vector"
+    # Slice the text to the target func.func only (up to the next func.func /
+    # module close). Match the attributes up to the closing brace on the same
+    # logical signature; the kernel_kind attr sits inside `attributes {...}`.
+    m = re.search(rf'func\.func\s+@{re.escape(kernel)}\b(.*?)(?=func\.func|^\}})',
+                  pto_text, re.S | re.M)
+    body = m.group(1) if m else ""
+    return "cube" if "kernel_kind" in body and "cube" in body else "vector"
 
 
-def preprocess_pto(pto_src: Path, pto_dst: Path, kernel_kind: str) -> None:
+def preprocess_pto(pto_src: Path, pto_dst: Path, kernel_kind: str,
+                   kernel: str | None = None) -> None:
     """Apply the two mandatory sed edits that tell ptoas to emit the kernel body.
 
     Without these, ptoas VPTO silently emits a ctor-only fatobj (no kernel
@@ -86,16 +102,28 @@ def preprocess_pto(pto_src: Path, pto_dst: Path, kernel_kind: str) -> None:
          the .pto already carries it, e.g. Qwen3 rmsnorm.pto).
       2. func:    `attributes {pto.kernel_kind` → `attributes {pto.kernel, pto.kernel_kind`
          (adds the `pto.kernel` attr that triggers kernel codegen).
+    When `kernel` is given (split .pto: qk_pv_aic + qk_pv_aiv in one file),
+    the func-attr edit is scoped to only `func.func @<kernel>`'s attributes —
+    otherwise both halves get the pto.kernel attr and ptoas emits two symbols.
     """
     text = pto_src.read_text(encoding="utf-8")
     text = text.replace(
         'module attributes {pto.target_arch = "a5"}',
         f'module attributes {{pto.target_arch = "a5", pto.kernel_kind = #pto.kernel_kind<{kernel_kind}>}}',
     )
-    text = text.replace(
-        "attributes {pto.kernel_kind",
-        "attributes {pto.kernel, pto.kernel_kind",
-    )
+    if kernel:
+        # Scope the pto.kernel insertion to the target func's attribute list.
+        text = re.sub(
+            rf'(func\.func\s+@{re.escape(kernel)}\([^)]*?\)\s*attributes\s*)\{{pto\.kernel_kind',
+            r'\g<1>{pto.kernel, pto.kernel_kind',
+            text,
+            count=1,
+        )
+    else:
+        text = text.replace(
+            "attributes {pto.kernel_kind",
+            "attributes {pto.kernel, pto.kernel_kind",
+        )
     pto_dst.write_text(text, encoding="utf-8")
 
 
