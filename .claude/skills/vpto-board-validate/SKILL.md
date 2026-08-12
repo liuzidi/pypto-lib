@@ -63,6 +63,16 @@ omitting the two steps above. Verified on `rmsnorm` (vector) and
    `TILELANG_PATH`, `TILELANG_PKG`. `vpto_run.py` checks these and reports
    if missing.
 
+## PMU / VEC-cycle collection (on-demand)
+
+To measure **VEC-only cycle** (`aiv_vec_time`, excluding MTE搬运/sync) for a
+built VPTO kernel on real A5 silicon, use CANN's `msprof op` operator
+profiler. The procedure (wrapper script + `msprof op --aic-metrics=PipeUtilization`)
+is documented in
+[docs/debug-and-tune/vpto-msprof-pmu-collection.md](../../../docs/debug-and-tune/vpto-msprof-pmu-collection.md).
+This is the only way to see VMI VF-fusion benefit — the skill's `[TIMING]`
+line is host-side wall-clock and includes MTE + CANN runtime overhead.
+
 ## Inputs
 
 - `--pto`: a pypto-emitted `.pto` (EmitC-era tile dialect:
