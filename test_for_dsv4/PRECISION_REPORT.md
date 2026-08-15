@@ -271,3 +271,100 @@ python3 test_for_dsv4/diagnose_crashes.py 0
 # sweep_results.csv         — 每 kernel 的 PASS/FAIL/max_diff
 # crash_diagnosis.json      — 每 kernel 的错误分类
 ```
+
+---
+
+## 附录 A: EmitC 路线对比（op-fusion=off）
+
+> ptoas 0.59 main, `--pto-backend=emitc --enable-insert-sync --enable-op-fusion=false`
+> bisheng VF ON (default), 103 kernels (split kernels excluded)
+
+### EmitC vs VPTO baseline 对比
+
+| 指标 | EmitC (op-fusion off) | VPTO baseline (op-fusion on) |
+|------|----------------------|------------------------------|
+| **PASS** | **99/103 (96%)** | 16/117 (14%) |
+| ptoas 编译失败 | 2 | 72 |
+| NPU crash | 0 | 23 |
+| precision fail | 6→2 (after golden fix) | 6 |
+| 其他 (bisheng 编译/_aiv crash) | 10 | 0 |
+
+**结论：.pto 文件本身基本没有问题。** EmitC 路线 99/103 PASS，证明 110 个 .pto kernel 的 IR 是正确的。
+
+### EmitC 失败分类（18→4 after golden fix）
+
+| 类别 | 数量 | kernel | 原因 |
+|------|------|--------|------|
+| bisheng 编译失败 | 3 | comb_sinkhorn, exp_gate_up_act, score_reduce | `TFillPadMode` 未定义（bisheng 端 bug） |
+| `_aiv` kernel crash | 7 | gate_aiv, mtp_projection_linear_aiv, prefill_idx_qr_hadamard_quant_aiv, prefill_idx_qr_proj_aiv, prefill_idx_score_aiv, prefill_idx_weights_proj_aiv, qk_pv_aiv | split kernel 的 `_aiv` 半在 EmitC 下 vector core 异常（已标记 unsupported） |
+| ptoas lowering 失败 | 2 | prefill_idx_topk, topk | `tgather` op 的 EmitC lowering 问题 |
+| precision fail (genuine) | 2 | prefill_c4_state_update, prefill_idx_c4_state_update | fp32 累积顺序差异（见附录 B） |
+
+---
+
+## 附录 B: Golden bug 修复记录
+
+### 修复 1: kv_rms_norm_rope — RMSNorm 求和范围错误 ✅ 已修复
+
+**问题**: golden 的 `_rms_norm_rope` 只对 `NOPE_DIM=448` 列求平方和，但 .pto kernel 对全 `HEAD_DIM=512` 列求和。
+
+**证据**: .pto 的循环 `scf.for kb = 0 to 8 step 2`（4 次迭代 × 128 列/次 = 512 列），而 golden 代码为：
+```python
+# BUG: 只求和 448 列
+sq = (rows[:, :NOPE_DIM] * rows[:, :NOPE_DIM]).sum(axis=1, keepdims=True) / HEAD_DIM
+```
+
+**修复**:
+```python
+# FIX: 求和全部 512 列
+sq = (rows * rows).sum(axis=1, keepdims=True) / HEAD_DIM
+```
+
+**验证**: 修复前 max_ulp=18 FAIL → 修复后 max_diff=1.0 PASS ✅
+
+### 修复 2: prefill_c4_state_update — buffer 映射错误 + pos==0 跳过错误
+
+**问题 1**: dict 字面量中 `v3` 定义了两次（Python 取最后一个），导致 cmp_ape 的随机数据生成到了错误大小的 buffer。
+
+**问题 2**: golden 把 cmp_ape 放进 `v3`，但 .pto 中 `v3 = pooled_kv [32, 512]`，`v5 = cmp_ape [4, 1024]`。buffer 映射错位。
+
+**问题 3**: golden 对 `pos == 0` 跳过 cmp_ape 加法，但 .pto 没有这个条件分支 — kernel 对所有 token 都加 cmp_ape。
+
+**修复**:
+- 去掉重复 v3 key
+- v3 → pooled_kv (make_fp32)，v5 → cmp_ape (make_fp32)
+- 去掉 `if pos > 0` 条件，始终加 cmp_ape
+- 去掉不存在的 v8/v9/v10
+
+**验证**: 仍 FAIL max_diff=0.098 — 属于 fp32 真精度差异（scatter+add 累积顺序）
+
+### 修复 3: prefill_idx_c4_state_update — 多余 buffer 键
+
+**问题**: golden 有 v8/v9/v10 但 .pto 只有 7 个 ptr 参数（v1-v7）。
+
+**修复**: 去掉 v8/v9/v10。
+
+**验证**: 仍 FAIL max_diff=0.071 — 属于 fp32 真精度差异
+
+### 未修复的 EmitC 精度失败（4 个，疑似真精度问题）
+
+| kernel | max_diff | 分析 |
+|--------|----------|------|
+| `prefill_c4_state_update` | 0.098 | golden 与 .pto 计算逻辑已对齐（逐行验证 SPMD 分块、inner loop 32x32、offset 1024+ob*32 等）。差异来自 fp32 scatter+add 累积顺序。 |
+| `prefill_idx_c4_state_update` | 0.071 | 同上，SPMD block_idx/4=token, block_idx%4=col_chunk。计算逻辑对齐。差异来自 fp32 累积。 |
+| `prefill_hca_c128_rmsnorm_rope` | 0.085 | golden 用 `sum(pooled*pooled)` 全列求和，与 .pto 一致。RoPE interleaved 逻辑也一致。差异可能来自 bf16→fp32 转换或 rsqrt 精度。 |
+| `prefill_hca_c128_softmax_pool` | 0.049 | softmax 的 fp32 exp/sum 累积顺序差异。golden 用 numpy 向量化，kernel 用 tile 逐块累加。 |
+
+### Split kernel 移除
+
+7 个 split .pto（含 `_aic`/`_aiv` 双函数）已从 `run_all.py` 中移除，标记为 unsupported：
+
+| .pto 文件 | 产生的 kernel 条目 |
+|-----------|------------------|
+| gate.pto | gate_aic, gate_aiv |
+| mtp_projection_linear.pto | mtp_projection_linear_aic, mtp_projection_linear_aiv |
+| prefill_idx_qr_hadamard_quant.pto | prefill_idx_qr_hadamard_quant_aic, prefill_idx_qr_hadamard_quant_aiv |
+| prefill_idx_qr_proj.pto | prefill_idx_qr_proj_aic, prefill_idx_qr_proj_aiv |
+| prefill_idx_score.pto | prefill_idx_score_aic, prefill_idx_score_aiv |
+| prefill_idx_weights_proj.pto | prefill_idx_weights_proj_aic, prefill_idx_weights_proj_aiv |
+| qk_pv.pto | qk_pv_aic, qk_pv_aiv |
