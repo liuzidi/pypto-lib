@@ -121,8 +121,9 @@ def gen_main_cpp(info: dict, outputs: list, load_vals: dict | None = None,
     """
     func = info["func_name"]
     launch = func[0].upper() + func[1:]
-    ptrs = [p for p in info["params"] if p["pto_type"] not in ("i32", "index")]
-    scals = [p for p in info["params"] if p["pto_type"] in ("i32", "index")]
+    _SCALAR_TYPES = ("i32", "index", "f32")
+    ptrs = [p for p in info["params"] if p.get("is_ptr", True)]
+    scals = [p for p in info["params"] if not p.get("is_ptr", True)]
     ec = dict(info.get("elem_counts", {}))
     if elem_counts_override:
         ec.update(elem_counts_override)
@@ -207,7 +208,7 @@ def gen_main_cpp(info: dict, outputs: list, load_vals: dict | None = None,
     decl_parts, call_parts = [], []
     for p in info["params"]:
         n, ct = p["name"], cpp_type(p["name"])
-        if p["pto_type"] in ("i32", "index"):
+        if not p.get("is_ptr", True):
             scal_type = pto_type_to_c(p["pto_type"])[0]
             decl_parts.append(f"{scal_type} {n}"); call_parts.append(n)
         else:

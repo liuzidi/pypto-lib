@@ -84,13 +84,14 @@ def parse_pto(pto_path: Path, kernel: str | None = None) -> dict:
     for i, dtype in enumerate(pt):
         info["params"].append({
             "name": f"v{i+1}", "pto_type": dtype, "arg": f"%arg{i}",
-            "view_name": view_names.get(i, ""),
+            "view_name": view_names.get(i, ""), "is_ptr": True,
         })
 
     # 匹配所有非 ptr 标量 (i32, index 等)，按签名顺序
     scalar_matchers = [
         (r'(%\w+):\s*index', "index"),
         (r'(%\w+):\s*i32', "i32"),
+        (r'(%\w+):\s*f32(?=[,\)])', "f32"),  # f32 scalar (not !pto.ptr<f32>)
     ]
     scalars_raw = []  # (pos_in_raw, arg_name, pto_type)
     for pattern, ptype in scalar_matchers:
@@ -101,7 +102,8 @@ def parse_pto(pto_path: Path, kernel: str | None = None) -> dict:
     for j, (_, sig_name, ptype) in enumerate(scalars_raw):
         idx = len(pt) + j + 1
         info["params"].append({"name": f"v{idx}", "pto_type": ptype,
-                               "arg": f"%arg{len(pt)+j}", "sig_name": sig_name})
+                               "arg": f"%arg{len(pt)+j}", "sig_name": sig_name,
+                               "is_ptr": False})
 
     for m in re.finditer(r'%c(\d+)_index\s*=\s*arith\.constant\s+(\d+)', text):
         info["dims"][f"%c{m.group(1)}_index"] = int(m.group(2))
@@ -188,23 +190,23 @@ def derive_scalar_values(info: dict, elem_counts: dict | None = None) -> dict:
 
 
 def pto_type_to_c(pto_type: str) -> tuple:
-    """Map a PTO element type to (host_c_type, device_gm_ptr_type)."""
+    """Map a PTO element type to (host_c_type, device_gm_ptr_type).
+
+    For ptr types (!pto.ptr<T>), gm_type has __gm__ prefix and * suffix.
+    For scalar types (i32/index/f32 without !pto.ptr), the caller uses
+    host_c_type only (generate_launch_cpp checks is_ptr to decide).
+    """
     mapping = {
         "f32": ("float", "__gm__ float*"),
         "f16": ("uint16_t", "__gm__ bfloat16_t*"),
         "bf16": ("uint16_t", "__gm__ bfloat16_t*"),
         "i32": ("int32_t", "__gm__ int32_t*"),
         "i64": ("int64_t", "__gm__ int64_t*"),
+        "index": ("int64_t", "__gm__ int64_t*"),
         "i16": ("int16_t", "__gm__ int16_t*"),
-        # i8/u8: quantized weights and int8 outputs. Without this, bisheng
-        # rejects the raw `i8` token ("unknown type name 'i8'") in launch.cpp.
         "i8": ("int8_t", "__gm__ int8_t*"),
         "u8": ("uint8_t", "__gm__ uint8_t*"),
     }
-    if pto_type == "i32":
-        return ("int32_t", "int32_t")
-    if pto_type == "index":
-        return ("int64_t", "int64_t")
     return mapping.get(pto_type, (pto_type, f"__gm__ {pto_type}*"))
 
 

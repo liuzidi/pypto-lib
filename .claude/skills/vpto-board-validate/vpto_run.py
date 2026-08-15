@@ -75,8 +75,16 @@ def _env(key: str) -> str:
 def _check_prereqs() -> list[str]:
     """Return a list of missing-prerequisite messages (empty = OK)."""
     missing = []
-    for k in ("PTOAS_BIN", "ASCEND_HOME_PATH", "BISHENG_BIN", "PTO_ISA_PATH",
-              "TILELANG_PATH", "TILELANG_PKG"):
+    # ptoas 0.59+ embeds TileOps + ptodsl in its runtime, so TILELANG_PATH /
+    # TILELANG_PKG are no longer required (the wrapper sets PYTHONPATH
+    # internally and rejects --tilelang-* CLI args). Still required for 0.53.
+    ptoas_ver_out = subprocess.run(
+        [_env("PTOAS_BIN"), "--version"], capture_output=True, text=True).stdout.strip()
+    is_new_ptoas = ptoas_ver_out >= "ptoas 0.54"
+    required = ("PTOAS_BIN", "ASCEND_HOME_PATH", "BISHENG_BIN", "PTO_ISA_PATH")
+    if not is_new_ptoas:
+        required = required + ("TILELANG_PATH", "TILELANG_PKG")
+    for k in required:
         v = _env(k)
         if not v or not Path(v).exists():
             missing.append(f"  {k} = {v!r} (missing)")
@@ -149,6 +157,11 @@ _BISHENG_VFOFF_MLLVM = [
     "-mllvm", "-cce-vf-enable-ub-dead-st-elimination=false",
     "-mllvm", "-cce-vf-auto-sync=off",
     "-mllvm", "-cce-vf-enable-vf-ifelse-extender=false",
+    # VF-fusion-off spills all vector ops to stack individually (no fusion
+    # into VLOOPV2). Without raising the VF stack limit, bisheng fails with
+    # "total stack object size (N) exceeded vf stack size (6144)" for kernels
+    # with many vector operations (10 DSV4 kernels hit this). 0x10000 = 64KB.
+    "-mllvm", "-cce-vf-stack-size=0x10000",
 ]
 
 
@@ -540,7 +553,15 @@ if __name__ == "__main__":
     # --- 4. ptoas VPTO -> fatobj ---
     fatobj = build_root / f"{kernel}.o"
     daemon_env = dict(cann_env)
-    daemon_env["PYTHONPATH"] = f"/tmp/mlir_core_vmi:{ptoas_source}/ptodsl:{tilelang_pkg}"
+    # ptoas 0.59+ bundles mlir inside its package and runs ptodsl in-process
+    # (no daemon socket). The PYTHONPATH just needs ptodsl + the build's python
+    # root so the wrapper's sys.path entries survive subprocess inheritance.
+    ptoas_ver_line = subprocess.run(
+        [ptoas_bin, "--version"], capture_output=True, text=True).stdout.strip()
+    if ptoas_ver_line >= "ptoas 0.59":
+        daemon_env["PYTHONPATH"] = f"{ptoas_source}/build/python:{ptoas_source}/ptodsl"
+    else:
+        daemon_env["PYTHONPATH"] = f"/tmp/mlir_core_vmi:{ptoas_source}/ptodsl"
     # clear stale daemon state
     for sock in Path("/tmp").glob("tilelib_daemon_*.sock"):
         try: sock.unlink()
@@ -548,10 +569,20 @@ if __name__ == "__main__":
     tileops_pycache = Path(tilelang) / "__pycache__"
     if tileops_pycache.exists():
         shutil.rmtree(tileops_pycache, ignore_errors=True)
-    _run([ptoas_bin] + _pto_flags_for_route(args.route)
-         + ["--tilelang-path", tilelang, "--tilelang-pkg-path", tilelang_pkg,
-            str(pto_file), "-o", str(fatobj)],
-         env=daemon_env, label=f"ptoas VPTO (route={args.route})")
+    # ptoas 0.59+ embeds TileOps + ptodsl in its own runtime; it no longer
+    # accepts --tilelang-path/--tilelang-pkg-path (unknown argument). The
+    # wrapper sets PYTHONPATH internally. Older ptoas (0.53) needed them.
+    ptoas_ver = subprocess.run([ptoas_bin, "--version"],
+                               capture_output=True, text=True).stdout.strip()
+    if ptoas_ver >= "ptoas 0.54":
+        _run([ptoas_bin] + _pto_flags_for_route(args.route)
+             + [str(pto_file), "-o", str(fatobj)],
+             env=daemon_env, label=f"ptoas VPTO (route={args.route})")
+    else:
+        _run([ptoas_bin] + _pto_flags_for_route(args.route)
+             + ["--tilelang-path", tilelang, "--tilelang-pkg-path", tilelang_pkg,
+                str(pto_file), "-o", str(fatobj)],
+             env=daemon_env, label=f"ptoas VPTO (route={args.route})")
 
     fatobj_info = _nm_fatobj(fatobj, kernel)
     print(f"[vpto_run] fatobj: {fatobj_info['size']} bytes, "

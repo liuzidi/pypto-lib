@@ -137,7 +137,7 @@ def generate_launch_cpp(info: dict) -> str:
     gm_parts, host_parts, call_parts = [], [], []
     for p in info["params"]:
         c_type, gm_type = pto_type_to_c(p["pto_type"])
-        if p["pto_type"] in ("i32", "index"):
+        if not p.get("is_ptr", True):
             gm_parts.append(f"{c_type} {p['name']}")
             host_parts.append(f"{c_type} {p['name']}")
             call_parts.append(p["name"])
