@@ -1,0 +1,4557 @@
+{
+  "build_bias": {
+    "func_name": "build_bias",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 49152
+    },
+    "scalar_dims": {}
+  },
+  "comb_sinkhorn": {
+    "func_name": "comb_sinkhorn",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "index"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v3": 24,
+      "v4": 128
+    },
+    "scalar_dims": {
+      "%arg5": [
+        [
+          "v1",
+          [
+            1
+          ]
+        ],
+        [
+          "v2",
+          [
+            32
+          ]
+        ]
+      ]
+    }
+  },
+  "csa_slots_build_valid_qk_plan": {
+    "func_name": "csa_slots_build_valid_qk_plan",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v6": 9216
+    },
+    "scalar_dims": {}
+  },
+  "exp_gate_mm": {
+    "func_name": "exp_gate_mm",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "i8"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "index"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 22020096,
+      "v3": 1056964608
+    },
+    "scalar_dims": {}
+  },
+  "exp_gate_up_act": {
+    "func_name": "exp_gate_up_act",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "index"
+      ],
+      [
+        "v8",
+        "index"
+      ],
+      [
+        "v9",
+        "index"
+      ],
+      [
+        "v10",
+        "i32"
+      ],
+      [
+        "v11",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 49152,
+      "v4": 3072,
+      "v5": 147456,
+      "v6": 147456
+    },
+    "scalar_dims": {}
+  },
+  "exp_h_q": {
+    "func_name": "exp_h_q",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "i8"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 49152,
+      "v2": 16,
+      "v3": 49152
+    },
+    "scalar_dims": {}
+  },
+  "exp_up_mm": {
+    "func_name": "exp_up_mm",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "i8"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "index"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 22020096,
+      "v3": 1056964608
+    },
+    "scalar_dims": {}
+  },
+  "exp_w2_act": {
+    "func_name": "exp_w2_act",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "index"
+      ],
+      [
+        "v8",
+        "i32"
+      ],
+      [
+        "v9",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 3072,
+      "v2": 16,
+      "v3": 114688,
+      "v5": 344064
+    },
+    "scalar_dims": {}
+  },
+  "exp_w2_mm": {
+    "func_name": "exp_w2_mm",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "i8"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 49152,
+      "v3": 1056964608
+    },
+    "scalar_dims": {}
+  },
+  "ffn_norm": {
+    "func_name": "ffn_norm",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 57344,
+      "v2": 7168,
+      "v3": 114688,
+      "v4": 16,
+      "v5": 8,
+      "v6": 16
+    },
+    "scalar_dims": {}
+  },
+  "gate": {
+    "func_name": "gate_aic",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 384,
+      "v2": 114688,
+      "v3": 2752512,
+      "v4": 16,
+      "v5": 8192
+    },
+    "scalar_dims": {}
+  },
+  "gate_pre_route": {
+    "func_name": "gate_pre_route",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 8192
+    },
+    "scalar_dims": {}
+  },
+  "gather_kv": {
+    "func_name": "gather_kv",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "bf16"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 25165824,
+      "v3": 8388608,
+      "v6": 2097152
+    },
+    "scalar_dims": {}
+  },
+  "hc_head_linear": {
+    "func_name": "hc_head_linear",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "index"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 114688,
+      "v3": 2048
+    },
+    "scalar_dims": {
+      "%arg4": [
+        [
+          "v1",
+          [
+            28672
+          ]
+        ]
+      ]
+    }
+  },
+  "hc_head_pre_fused": {
+    "func_name": "hc_head_pre_fused",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "index"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 1,
+      "v2": 4,
+      "v3": 2048,
+      "v4": 2048,
+      "v5": 128
+    },
+    "scalar_dims": {}
+  },
+  "hc_head_reduce": {
+    "func_name": "hc_head_reduce",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "index"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 2048
+    },
+    "scalar_dims": {
+      "%arg4": [
+        [
+          "v2",
+          [
+            7168
+          ]
+        ],
+        [
+          "v3",
+          [
+            28672
+          ]
+        ]
+      ]
+    }
+  },
+  "hc_head_rms": {
+    "func_name": "hc_head_rms",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "index"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 128
+    },
+    "scalar_dims": {
+      "%arg2": [
+        [
+          "v1",
+          [
+            28672
+          ]
+        ]
+      ]
+    }
+  },
+  "hc_head_seed": {
+    "func_name": "hc_head_seed",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 2048
+    },
+    "scalar_dims": {}
+  },
+  "hc_post": {
+    "func_name": "hc_post",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "index"
+      ],
+      [
+        "v8",
+        "i32"
+      ],
+      [
+        "v9",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v3": 57344,
+      "v4": 128
+    },
+    "scalar_dims": {
+      "%arg5": [
+        [
+          "v1",
+          [
+            28672
+          ]
+        ],
+        [
+          "v5",
+          [
+            28672
+          ]
+        ]
+      ],
+      "%arg6": [
+        [
+          "v2",
+          [
+            4
+          ]
+        ]
+      ]
+    }
+  },
+  "hc_post_inactive_pad": {
+    "func_name": "hc_post_inactive_pad",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "index"
+      ],
+      [
+        "v3",
+        "index"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ]
+    ],
+    "elem_counts": {},
+    "scalar_dims": {
+      "%arg3": [
+        [
+          "v1",
+          [
+            28672
+          ]
+        ]
+      ]
+    }
+  },
+  "hc_post_prefill": {
+    "func_name": "hc_post_prefill",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "index"
+      ],
+      [
+        "v8",
+        "index"
+      ],
+      [
+        "v9",
+        "i32"
+      ],
+      [
+        "v10",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v3": 917504,
+      "v4": 2048
+    },
+    "scalar_dims": {
+      "%arg6": [
+        [
+          "v1",
+          [
+            28672
+          ]
+        ],
+        [
+          "v5",
+          [
+            28672
+          ]
+        ]
+      ],
+      "%arg7": [
+        [
+          "v2",
+          [
+            4
+          ]
+        ]
+      ]
+    }
+  },
+  "hc_pre_linear": {
+    "func_name": "hc_pre_linear",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "index"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 688128
+    },
+    "scalar_dims": {
+      "%arg4": [
+        [
+          "v1",
+          [
+            28672
+          ]
+        ]
+      ],
+      "%arg5": [
+        [
+          "v3",
+          [
+            32
+          ]
+        ]
+      ]
+    }
+  },
+  "hc_pre_rms": {
+    "func_name": "hc_pre_rms",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "index"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ]
+    ],
+    "elem_counts": {},
+    "scalar_dims": {
+      "%arg2": [
+        [
+          "v1",
+          [
+            28672
+          ]
+        ]
+      ],
+      "%arg3": [
+        [
+          "v2",
+          [
+            1
+          ]
+        ]
+      ]
+    }
+  },
+  "hc_pre_seed": {
+    "func_name": "hc_pre_seed",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "index"
+      ],
+      [
+        "v3",
+        "index"
+      ]
+    ],
+    "elem_counts": {},
+    "scalar_dims": {
+      "%arg2": [
+        [
+          "v1",
+          [
+            32
+          ]
+        ]
+      ]
+    }
+  },
+  "idx_qr_proj_dequant": {
+    "func_name": "idx_qr_proj_dequant",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 8192,
+      "v3": 8,
+      "v4": 65536
+    },
+    "scalar_dims": {}
+  },
+  "idx_qr_proj_matmul": {
+    "func_name": "idx_qr_proj_matmul",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "i8"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 12288,
+      "v3": 12582912
+    },
+    "scalar_dims": {}
+  },
+  "kv_and_cache_write": {
+    "func_name": "kv_and_cache_write",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i64"
+      ],
+      [
+        "v6",
+        "f32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 2048,
+      "v2": 1048576,
+      "v3": 1024,
+      "v5": 8,
+      "v6": 8192
+    },
+    "scalar_dims": {}
+  },
+  "kv_hadamard": {
+    "func_name": "kv_hadamard",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "bf16"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 2048,
+      "v2": 2048,
+      "v3": 16384
+    },
+    "scalar_dims": {}
+  },
+  "kv_proj_matmul": {
+    "func_name": "kv_proj_matmul",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "index"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 65536,
+      "v3": 3670016
+    },
+    "scalar_dims": {
+      "%arg5": [
+        [
+          "v2",
+          [
+            7168
+          ]
+        ]
+      ]
+    }
+  },
+  "kv_proj_seed": {
+    "func_name": "kv_proj_seed",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "index"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 65536
+    },
+    "scalar_dims": {}
+  },
+  "kv_rms_norm_rope": {
+    "func_name": "kv_rms_norm_rope",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "bf16"
+      ],
+      [
+        "v5",
+        "bf16"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 65536,
+      "v3": 512
+    },
+    "scalar_dims": {
+      "%arg5": [
+        [
+          "v2",
+          [
+            512
+          ]
+        ],
+        [
+          "v4",
+          [
+            64
+          ]
+        ],
+        [
+          "v5",
+          [
+            64
+          ]
+        ]
+      ]
+    }
+  },
+  "kv_score_proj": {
+    "func_name": "kv_score_proj",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 57344,
+      "v2": 7340032,
+      "v3": 7340032,
+      "v4": 16384,
+      "v5": 16384
+    },
+    "scalar_dims": {}
+  },
+  "kv_touch": {
+    "func_name": "kv_touch",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 8388608
+    },
+    "scalar_dims": {}
+  },
+  "merge_norm": {
+    "func_name": "merge_norm",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "f32"
+      ],
+      [
+        "v8",
+        "bf16"
+      ],
+      [
+        "v9",
+        "i32"
+      ],
+      [
+        "v10",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 1024,
+      "v2": 1024,
+      "v3": 524288,
+      "v4": 128,
+      "v6": 512,
+      "v7": 512,
+      "v8": 524288
+    },
+    "scalar_dims": {}
+  },
+  "mix_x": {
+    "func_name": "mix_x",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "index"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 57344
+    },
+    "scalar_dims": {
+      "%arg3": [
+        [
+          "v1",
+          [
+            8
+          ]
+        ]
+      ],
+      "%arg4": [
+        [
+          "v3",
+          [
+            28672
+          ]
+        ]
+      ]
+    }
+  },
+  "mtp_projection_linear": {
+    "func_name": "mtp_projection_linear_aic",
+    "params": [
+      [
+        "v1",
+        "i8"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "i8"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "f32"
+      ],
+      [
+        "v8",
+        "i8"
+      ],
+      [
+        "v9",
+        "f32"
+      ],
+      [
+        "v10",
+        "index"
+      ],
+      [
+        "v11",
+        "index"
+      ],
+      [
+        "v12",
+        "index"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 51380224,
+      "v3": 7168,
+      "v5": 51380224,
+      "v6": 7168
+    },
+    "scalar_dims": {
+      "%arg11": [
+        [
+          "v1",
+          [
+            7168
+          ]
+        ],
+        [
+          "v4",
+          [
+            1
+          ]
+        ],
+        [
+          "v7",
+          [
+            28672
+          ]
+        ],
+        [
+          "v8",
+          [
+            28672
+          ]
+        ],
+        [
+          "v9",
+          [
+            4
+          ]
+        ]
+      ]
+    }
+  },
+  "mtp_projection_norm": {
+    "func_name": "mtp_projection_norm",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "bf16"
+      ],
+      [
+        "v7",
+        "f32"
+      ],
+      [
+        "v8",
+        "f32"
+      ],
+      [
+        "v9",
+        "f32"
+      ],
+      [
+        "v10",
+        "f32"
+      ],
+      [
+        "v11",
+        "f32"
+      ],
+      [
+        "v12",
+        "f32"
+      ],
+      [
+        "v13",
+        "index"
+      ],
+      [
+        "v14",
+        "index"
+      ],
+      [
+        "v15",
+        "index"
+      ]
+    ],
+    "elem_counts": {
+      "v7": 7168,
+      "v8": 7168,
+      "v9": 7168,
+      "v10": 7168
+    },
+    "scalar_dims": {
+      "%arg13": [
+        [
+          "v1",
+          [
+            1
+          ]
+        ],
+        [
+          "v2",
+          [
+            56
+          ]
+        ],
+        [
+          "v3",
+          [
+            7168
+          ]
+        ],
+        [
+          "v4",
+          [
+            224
+          ]
+        ],
+        [
+          "v5",
+          [
+            28672
+          ]
+        ],
+        [
+          "v11",
+          [
+            4
+          ]
+        ]
+      ],
+      "%arg14": [
+        [
+          "v6",
+          [
+            7168
+          ]
+        ],
+        [
+          "v12",
+          [
+            28672
+          ]
+        ]
+      ]
+    }
+  },
+  "mtp_projection_output": {
+    "func_name": "mtp_projection_output",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "index"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "index"
+      ]
+    ],
+    "elem_counts": {},
+    "scalar_dims": {
+      "%arg3": [
+        [
+          "v1",
+          [
+            28672
+          ]
+        ]
+      ],
+      "%arg4": [
+        [
+          "v2",
+          [
+            28672
+          ]
+        ]
+      ]
+    }
+  },
+  "mtp_projection_quant": {
+    "func_name": "mtp_projection_quant",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "i8"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "i8"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "f32"
+      ],
+      [
+        "v8",
+        "f32"
+      ],
+      [
+        "v9",
+        "index"
+      ],
+      [
+        "v10",
+        "index"
+      ]
+    ],
+    "elem_counts": {},
+    "scalar_dims": {
+      "%arg9": [
+        [
+          "v1",
+          [
+            56
+          ]
+        ],
+        [
+          "v2",
+          [
+            1
+          ]
+        ],
+        [
+          "v3",
+          [
+            7168
+          ]
+        ],
+        [
+          "v4",
+          [
+            7168
+          ]
+        ],
+        [
+          "v5",
+          [
+            28672
+          ]
+        ],
+        [
+          "v6",
+          [
+            4
+          ]
+        ],
+        [
+          "v7",
+          [
+            224
+          ]
+        ],
+        [
+          "v8",
+          [
+            28672
+          ]
+        ]
+      ]
+    }
+  },
+  "mtp_projection_rms": {
+    "func_name": "mtp_projection_rms",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "index"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "index"
+      ]
+    ],
+    "elem_counts": {},
+    "scalar_dims": {
+      "%arg5": [
+        [
+          "v1",
+          [
+            7168
+          ]
+        ],
+        [
+          "v4",
+          [
+            28672
+          ]
+        ]
+      ],
+      "%arg6": [
+        [
+          "v2",
+          [
+            1
+          ]
+        ],
+        [
+          "v3",
+          [
+            4
+          ]
+        ]
+      ]
+    }
+  },
+  "prefill_c4_cache_write": {
+    "func_name": "prefill_c4_cache_write",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 2097152,
+      "v3": 16384
+    },
+    "scalar_dims": {}
+  },
+  "prefill_c4_kv_score_proj": {
+    "func_name": "prefill_c4_kv_score_proj",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 917504,
+      "v2": 7340032,
+      "v3": 7340032,
+      "v4": 131072,
+      "v5": 131072
+    },
+    "scalar_dims": {}
+  },
+  "prefill_c4_rmsnorm_rope": {
+    "func_name": "prefill_c4_rmsnorm_rope",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "bf16"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "bf16"
+      ],
+      [
+        "v8",
+        "i32"
+      ],
+      [
+        "v9",
+        "i32"
+      ],
+      [
+        "v10",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v3": 1048576,
+      "v4": 1048576,
+      "v5": 16384,
+      "v6": 16384,
+      "v7": 512
+    },
+    "scalar_dims": {}
+  },
+  "prefill_c4_softmax_pool": {
+    "func_name": "prefill_c4_softmax_pool",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "f32"
+      ],
+      [
+        "v8",
+        "f32"
+      ],
+      [
+        "v9",
+        "f32"
+      ],
+      [
+        "v10",
+        "index"
+      ],
+      [
+        "v11",
+        "i32"
+      ],
+      [
+        "v12",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v4": 532480,
+      "v6": 4096,
+      "v7": 131072,
+      "v8": 131072,
+      "v9": 16384
+    },
+    "scalar_dims": {}
+  },
+  "prefill_c4_state_update": {
+    "func_name": "prefill_c4_state_update",
+    "params": [
+      [
+        "v1",
+        "i64"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "f32"
+      ],
+      [
+        "v8",
+        "index"
+      ],
+      [
+        "v9",
+        "i32"
+      ],
+      [
+        "v10",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 128,
+      "v3": 16384,
+      "v4": 532480,
+      "v5": 4096,
+      "v6": 131072,
+      "v7": 131072
+    },
+    "scalar_dims": {}
+  },
+  "prefill_c4_write_map": {
+    "func_name": "prefill_c4_write_map",
+    "params": [
+      [
+        "v1",
+        "i64"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "index"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 128
+    },
+    "scalar_dims": {}
+  },
+  "prefill_csa_cache_write": {
+    "func_name": "prefill_csa_cache_write",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "i64"
+      ],
+      [
+        "v3",
+        "bf16"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 8388608,
+      "v2": 128,
+      "v3": 65536
+    },
+    "scalar_dims": {}
+  },
+  "prefill_csa_idx_halfrope": {
+    "func_name": "prefill_csa_idx_halfrope",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "bf16"
+      ],
+      [
+        "v5",
+        "bf16"
+      ],
+      [
+        "v6",
+        "index"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 4096,
+      "v2": 4096,
+      "v4": 1048576,
+      "v5": 1048576
+    },
+    "scalar_dims": {}
+  },
+  "prefill_csa_sparse_idx_tile": {
+    "func_name": "prefill_csa_sparse_idx_tile",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {},
+    "scalar_dims": {}
+  },
+  "prefill_hca_c128_kv_finalize": {
+    "func_name": "prefill_hca_c128_kv_finalize",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "f32"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 2097152,
+      "v3": 4096
+    },
+    "scalar_dims": {}
+  },
+  "prefill_hca_c128_kv_score_proj": {
+    "func_name": "prefill_hca_c128_kv_score_proj",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 917504,
+      "v2": 3670016,
+      "v3": 3670016,
+      "v4": 65536,
+      "v5": 65536
+    },
+    "scalar_dims": {}
+  },
+  "prefill_hca_c128_norm_pad_init": {
+    "func_name": "prefill_hca_c128_norm_pad_init",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 4096,
+      "v2": 4096
+    },
+    "scalar_dims": {}
+  },
+  "prefill_hca_c128_rmsnorm_rope": {
+    "func_name": "prefill_hca_c128_rmsnorm_rope",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "bf16"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "bf16"
+      ]
+    ],
+    "elem_counts": {
+      "v3": 1048576,
+      "v4": 1048576,
+      "v5": 4096,
+      "v6": 4096,
+      "v7": 512
+    },
+    "scalar_dims": {}
+  },
+  "prefill_hca_c128_softmax_pool": {
+    "func_name": "prefill_hca_c128_softmax_pool",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v4": 524288,
+      "v5": 4096
+    },
+    "scalar_dims": {}
+  },
+  "prefill_hca_c128_state_scatter_pre": {
+    "func_name": "prefill_hca_c128_state_scatter_pre",
+    "params": [
+      [
+        "v1",
+        "i64"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "index"
+      ],
+      [
+        "v8",
+        "i32"
+      ],
+      [
+        "v9",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 128,
+      "v3": 65536,
+      "v4": 524288,
+      "v5": 65536,
+      "v6": 65536
+    },
+    "scalar_dims": {}
+  },
+  "prefill_hca_c128_write_map": {
+    "func_name": "prefill_hca_c128_write_map",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "i64"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "index"
+      ]
+    ],
+    "elem_counts": {
+      "v3": 128
+    },
+    "scalar_dims": {}
+  },
+  "prefill_hca_cache_write": {
+    "func_name": "prefill_hca_cache_write",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "i64"
+      ],
+      [
+        "v3",
+        "bf16"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 8388608,
+      "v2": 128,
+      "v3": 65536
+    },
+    "scalar_dims": {}
+  },
+  "prefill_hca_sparse_indices": {
+    "func_name": "prefill_hca_sparse_indices",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "index"
+      ]
+    ],
+    "elem_counts": {},
+    "scalar_dims": {}
+  },
+  "prefill_idx_c4_cache_write": {
+    "func_name": "prefill_idx_c4_cache_write",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 4096,
+      "v2": 1048576,
+      "v4": 8192
+    },
+    "scalar_dims": {}
+  },
+  "prefill_idx_c4_kv_hadamard": {
+    "func_name": "prefill_idx_c4_kv_hadamard",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 4096,
+      "v2": 4096,
+      "v3": 16384
+    },
+    "scalar_dims": {}
+  },
+  "prefill_idx_c4_kv_score_proj": {
+    "func_name": "prefill_idx_c4_kv_score_proj",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 917504,
+      "v2": 1835008,
+      "v3": 1835008,
+      "v4": 32768,
+      "v5": 32768
+    },
+    "scalar_dims": {}
+  },
+  "prefill_idx_c4_rmsnorm_rope": {
+    "func_name": "prefill_idx_c4_rmsnorm_rope",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "bf16"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "bf16"
+      ],
+      [
+        "v7",
+        "bf16"
+      ],
+      [
+        "v8",
+        "i32"
+      ],
+      [
+        "v9",
+        "i32"
+      ],
+      [
+        "v10",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v3": 1048576,
+      "v4": 1048576,
+      "v5": 4096,
+      "v6": 128,
+      "v7": 4096
+    },
+    "scalar_dims": {}
+  },
+  "prefill_idx_c4_softmax_pool": {
+    "func_name": "prefill_idx_c4_softmax_pool",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "f32"
+      ],
+      [
+        "v8",
+        "f32"
+      ],
+      [
+        "v9",
+        "f32"
+      ],
+      [
+        "v10",
+        "index"
+      ],
+      [
+        "v11",
+        "i32"
+      ],
+      [
+        "v12",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v4": 133120,
+      "v6": 1024,
+      "v7": 32768,
+      "v8": 32768,
+      "v9": 4096
+    },
+    "scalar_dims": {}
+  },
+  "prefill_idx_c4_state_update": {
+    "func_name": "prefill_idx_c4_state_update",
+    "params": [
+      [
+        "v1",
+        "i64"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "f32"
+      ],
+      [
+        "v8",
+        "index"
+      ],
+      [
+        "v9",
+        "i32"
+      ],
+      [
+        "v10",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 128,
+      "v3": 1024,
+      "v4": 4096,
+      "v5": 32768,
+      "v6": 133120,
+      "v7": 32768
+    },
+    "scalar_dims": {}
+  },
+  "prefill_idx_c4_write_map": {
+    "func_name": "prefill_idx_c4_write_map",
+    "params": [
+      [
+        "v1",
+        "i64"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "index"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 128
+    },
+    "scalar_dims": {}
+  },
+  "prefill_idx_qr_hadamard_quant": {
+    "func_name": "prefill_idx_qr_hadamard_quant_aic",
+    "params": [
+      [
+        "v1",
+        "i8"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "bf16"
+      ],
+      [
+        "v5",
+        "bf16"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 1048576,
+      "v2": 8192,
+      "v3": 1048576,
+      "v4": 524288,
+      "v5": 16384
+    },
+    "scalar_dims": {}
+  },
+  "prefill_idx_qr_proj": {
+    "func_name": "prefill_idx_qr_proj_aic",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "i8"
+      ],
+      [
+        "v4",
+        "i8"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 8192,
+      "v2": 1048576,
+      "v3": 196608,
+      "v4": 12582912,
+      "v5": 128
+    },
+    "scalar_dims": {}
+  },
+  "prefill_idx_qr_rope": {
+    "func_name": "prefill_idx_qr_rope",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 4096,
+      "v2": 4096,
+      "v3": 524288,
+      "v4": 1048576
+    },
+    "scalar_dims": {}
+  },
+  "prefill_idx_score": {
+    "func_name": "prefill_idx_score_aic",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "i8"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "i8"
+      ],
+      [
+        "v7",
+        "f32"
+      ],
+      [
+        "v8",
+        "f32"
+      ],
+      [
+        "v9",
+        "index"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 262144,
+      "v4": 1048576,
+      "v5": 8192,
+      "v6": 1048576,
+      "v7": 8192,
+      "v8": 8192
+    },
+    "scalar_dims": {}
+  },
+  "prefill_idx_score_init": {
+    "func_name": "prefill_idx_score_init",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "index"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 262144
+    },
+    "scalar_dims": {}
+  },
+  "prefill_idx_score_out": {
+    "func_name": "prefill_idx_score_out",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 262144,
+      "v2": 32768
+    },
+    "scalar_dims": {}
+  },
+  "prefill_idx_topk": {
+    "func_name": "prefill_idx_topk",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v3": 262144
+    },
+    "scalar_dims": {}
+  },
+  "prefill_idx_weights_proj": {
+    "func_name": "prefill_idx_weights_proj_aic",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 917504,
+      "v2": 458752,
+      "v3": 8192
+    },
+    "scalar_dims": {}
+  },
+  "proj_a_mm": {
+    "func_name": "proj_a_mm",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "index"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 524288,
+      "v2": 67108864,
+      "v3": 262144
+    },
+    "scalar_dims": {}
+  },
+  "proj_b_act": {
+    "func_name": "proj_b_act",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "bf16"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 7168,
+      "v3": 128,
+      "v4": 57344
+    },
+    "scalar_dims": {}
+  },
+  "proj_b_mm": {
+    "func_name": "proj_b_mm",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "i8"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "index"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 262144,
+      "v3": 117440512
+    },
+    "scalar_dims": {}
+  },
+  "q_rope_prepare": {
+    "func_name": "q_rope_prepare",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {},
+    "scalar_dims": {
+      "%arg5": [
+        [
+          "v1",
+          [
+            64
+          ]
+        ],
+        [
+          "v2",
+          [
+            64
+          ]
+        ],
+        [
+          "v3",
+          [
+            64
+          ]
+        ],
+        [
+          "v4",
+          [
+            64
+          ]
+        ]
+      ]
+    }
+  },
+  "qk_pv": {
+    "func_name": "qk_pv_aic",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "bf16"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 1024,
+      "v2": 524288,
+      "v3": 1024,
+      "v4": 1024,
+      "v5": 524288,
+      "v6": 524288
+    },
+    "scalar_dims": {}
+  },
+  "qkv_rope_rows": {
+    "func_name": "qkv_rope_rows",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "bf16"
+      ],
+      [
+        "v5",
+        "bf16"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 8192,
+      "v2": 8192,
+      "v4": 1048576,
+      "v5": 1048576
+    },
+    "scalar_dims": {}
+  },
+  "qproj_dequant_rms_nope_rope": {
+    "func_name": "qproj_dequant_rms_nope_rope",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "f32"
+      ],
+      [
+        "v8",
+        "index"
+      ],
+      [
+        "v9",
+        "index"
+      ],
+      [
+        "v10",
+        "index"
+      ],
+      [
+        "v11",
+        "i32"
+      ],
+      [
+        "v12",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v7": 65536
+    },
+    "scalar_dims": {
+      "%arg9": [
+        [
+          "v1",
+          [
+            65536
+          ]
+        ],
+        [
+          "v2",
+          [
+            1
+          ]
+        ],
+        [
+          "v3",
+          [
+            64
+          ]
+        ],
+        [
+          "v4",
+          [
+            64
+          ]
+        ]
+      ]
+    }
+  },
+  "qproj_matmul": {
+    "func_name": "qproj_matmul",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "i8"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 196608,
+      "v3": 100663296
+    },
+    "scalar_dims": {}
+  },
+  "qr_hadamard_matmul": {
+    "func_name": "qr_hadamard_matmul",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 65536,
+      "v2": 16384,
+      "v3": 65536
+    },
+    "scalar_dims": {}
+  },
+  "qr_hadamard_quant": {
+    "func_name": "qr_hadamard_quant",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "i8"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 65536,
+      "v2": 512,
+      "v3": 65536
+    },
+    "scalar_dims": {}
+  },
+  "qr_proj_matmul": {
+    "func_name": "qr_proj_matmul",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "index"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 196608,
+      "v3": 11010048
+    },
+    "scalar_dims": {
+      "%arg5": [
+        [
+          "v2",
+          [
+            7168
+          ]
+        ]
+      ]
+    }
+  },
+  "qr_proj_seed": {
+    "func_name": "qr_proj_seed",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "index"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 196608
+    },
+    "scalar_dims": {}
+  },
+  "qr_rms_norm_quant": {
+    "func_name": "qr_rms_norm_quant",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "i8"
+      ],
+      [
+        "v5",
+        "i8"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 196608,
+      "v2": 1536,
+      "v4": 196608
+    },
+    "scalar_dims": {
+      "%arg5": [
+        [
+          "v3",
+          [
+            1
+          ]
+        ],
+        [
+          "v5",
+          [
+            1536
+          ]
+        ]
+      ]
+    }
+  },
+  "qr_rope": {
+    "func_name": "qr_rope",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "bf16"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 128,
+      "v2": 128,
+      "v3": 65536,
+      "v4": 65536
+    },
+    "scalar_dims": {}
+  },
+  "quant": {
+    "func_name": "quant",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "index"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 128,
+      "v2": 262144,
+      "v3": 262144
+    },
+    "scalar_dims": {}
+  },
+  "rms_norm": {
+    "func_name": "rms_norm",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 57344,
+      "v2": 57344,
+      "v3": 7168
+    },
+    "scalar_dims": {}
+  },
+  "rmsnorm_rope": {
+    "func_name": "rmsnorm_rope",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "bf16"
+      ],
+      [
+        "v5",
+        "bf16"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 128,
+      "v2": 128,
+      "v3": 2048,
+      "v4": 128,
+      "v5": 2048
+    },
+    "scalar_dims": {}
+  },
+  "rmsnorm_rope_cache_write": {
+    "func_name": "rmsnorm_rope_cache_write",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "bf16"
+      ],
+      [
+        "v6",
+        "bf16"
+      ],
+      [
+        "v7",
+        "f32"
+      ],
+      [
+        "v8",
+        "i32"
+      ],
+      [
+        "v9",
+        "i64"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 128,
+      "v2": 128,
+      "v3": 8192,
+      "v4": 8192,
+      "v5": 512,
+      "v6": 2097152,
+      "v7": 4096,
+      "v9": 8
+    },
+    "scalar_dims": {}
+  },
+  "rope": {
+    "func_name": "rope",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 8388608,
+      "v2": 1048576,
+      "v3": 8192,
+      "v4": 8192
+    },
+    "scalar_dims": {}
+  },
+  "rope_cs": {
+    "func_name": "rope_cs",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "bf16"
+      ],
+      [
+        "v5",
+        "bf16"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 512,
+      "v3": 512,
+      "v4": 512,
+      "v5": 512
+    },
+    "scalar_dims": {}
+  },
+  "route_hash": {
+    "func_name": "route_hash",
+    "params": [
+      [
+        "v1",
+        "i64"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 8,
+      "v3": 8192,
+      "v5": 48
+    },
+    "scalar_dims": {}
+  },
+  "scatter_softmax_pool": {
+    "func_name": "scatter_softmax_pool",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "i64"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "f32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 532480,
+      "v2": 8192,
+      "v4": 8,
+      "v5": 16384,
+      "v6": 16384,
+      "v7": 4096
+    },
+    "scalar_dims": {}
+  },
+  "score_mat": {
+    "func_name": "score_mat",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i8"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 65536,
+      "v5": 1048576
+    },
+    "scalar_dims": {}
+  },
+  "score_reduce": {
+    "func_name": "score_reduce",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "i32"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "f32"
+      ],
+      [
+        "v9",
+        "i32"
+      ],
+      [
+        "v10",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v3": 512,
+      "v4": 1024,
+      "v5": 32768,
+      "v8": 8192
+    },
+    "scalar_dims": {}
+  },
+  "sh_gate_mm": {
+    "func_name": "sh_gate_mm",
+    "params": [
+      [
+        "v1",
+        "i8"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 57344,
+      "v2": 22020096
+    },
+    "scalar_dims": {}
+  },
+  "sh_gate_up_act_q": {
+    "func_name": "sh_gate_up_act_q",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "f32"
+      ],
+      [
+        "v7",
+        "f32"
+      ],
+      [
+        "v8",
+        "i8"
+      ],
+      [
+        "v9",
+        "index"
+      ],
+      [
+        "v10",
+        "index"
+      ],
+      [
+        "v11",
+        "i32"
+      ],
+      [
+        "v12",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 8,
+      "v2": 49152,
+      "v5": 3072,
+      "v6": 3072,
+      "v7": 128,
+      "v8": 49152
+    },
+    "scalar_dims": {}
+  },
+  "sh_up_mm": {
+    "func_name": "sh_up_mm",
+    "params": [
+      [
+        "v1",
+        "i8"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "index"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 57344,
+      "v2": 22020096
+    },
+    "scalar_dims": {}
+  },
+  "sh_w2_act": {
+    "func_name": "sh_w2_act",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "index"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 128,
+      "v2": 57344,
+      "v4": 7168
+    },
+    "scalar_dims": {}
+  },
+  "sh_w2_mm": {
+    "func_name": "sh_w2_mm",
+    "params": [
+      [
+        "v1",
+        "i8"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 49152,
+      "v2": 22020096
+    },
+    "scalar_dims": {}
+  },
+  "split_pre_post": {
+    "func_name": "split_pre_post",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "f32"
+      ],
+      [
+        "v6",
+        "index"
+      ],
+      [
+        "v7",
+        "i32"
+      ],
+      [
+        "v8",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v2": 24,
+      "v5": 32
+    },
+    "scalar_dims": {
+      "%arg7": [
+        [
+          "v1",
+          [
+            1
+          ]
+        ],
+        [
+          "v3",
+          [
+            32
+          ]
+        ],
+        [
+          "v4",
+          [
+            8
+          ]
+        ]
+      ]
+    }
+  },
+  "swa_cache_insert_valid_bias": {
+    "func_name": "swa_cache_insert_valid_bias",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "i64"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "f32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 8388608,
+      "v2": 8,
+      "v3": 4096,
+      "v5": 1024
+    },
+    "scalar_dims": {}
+  },
+  "swa_gather_kv": {
+    "func_name": "swa_gather_kv",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "bf16"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 524288,
+      "v3": 8388608
+    },
+    "scalar_dims": {}
+  },
+  "swa_rope_step": {
+    "func_name": "swa_rope_step",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "bf16"
+      ],
+      [
+        "v5",
+        "bf16"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 512,
+      "v2": 512,
+      "v4": 1048576,
+      "v5": 1048576
+    },
+    "scalar_dims": {}
+  },
+  "topk": {
+    "func_name": "topk",
+    "params": [
+      [
+        "v1",
+        "i32"
+      ],
+      [
+        "v2",
+        "i32"
+      ],
+      [
+        "v3",
+        "i32"
+      ],
+      [
+        "v4",
+        "f32"
+      ],
+      [
+        "v5",
+        "i32"
+      ],
+      [
+        "v6",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v4": 32768
+    },
+    "scalar_dims": {}
+  },
+  "weights_proj": {
+    "func_name": "weights_proj",
+    "params": [
+      [
+        "v1",
+        "bf16"
+      ],
+      [
+        "v2",
+        "bf16"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "i32"
+      ],
+      [
+        "v5",
+        "i32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 57344,
+      "v2": 458752,
+      "v3": 7168
+    },
+    "scalar_dims": {}
+  },
+  "weights_proj_reduce": {
+    "func_name": "weights_proj_reduce",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "f32"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 7168,
+      "v2": 1024
+    },
+    "scalar_dims": {}
+  },
+  "x_norm_quant": {
+    "func_name": "x_norm_quant",
+    "params": [
+      [
+        "v1",
+        "f32"
+      ],
+      [
+        "v2",
+        "i8"
+      ],
+      [
+        "v3",
+        "f32"
+      ],
+      [
+        "v4",
+        "index"
+      ]
+    ],
+    "elem_counts": {
+      "v1": 16,
+      "v2": 57344,
+      "v3": 114688
+    },
+    "scalar_dims": {}
+  }
+}

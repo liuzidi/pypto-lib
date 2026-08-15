@@ -1,0 +1,394 @@
+{
+  "comb_sinkhorn": [
+    "v4",
+    "v4"
+  ],
+  "merge_norm": [
+    "v8",
+    "v8"
+  ],
+  "kv_score_proj": [
+    "v4",
+    "v4",
+    "v5",
+    "v5"
+  ],
+  "kv_score_proj_0": [
+    "v4",
+    "v4",
+    "v5",
+    "v5"
+  ],
+  "kv_touch": [
+    "v1",
+    "v1"
+  ],
+  "mix_x": [
+    "v2",
+    "v2"
+  ],
+  "proj_a_mm": [
+    "v3",
+    "v3"
+  ],
+  "proj_b_act": [
+    "v4",
+    "v4"
+  ],
+  "proj_b_mm": [
+    "v1",
+    "v1"
+  ],
+  "q_rope_prepare": [
+    "v3",
+    "v3",
+    "v4",
+    "v4",
+    "v5",
+    "v5"
+  ],
+  "rms_norm": [
+    "v2",
+    "v2"
+  ],
+  "rope": [
+    "v1",
+    "v1"
+  ],
+  "rope_cs": [
+    "v1",
+    "v1",
+    "v2",
+    "v2",
+    "v3",
+    "v3"
+  ],
+  "scatter_softmax_pool": [
+    "v1",
+    "v1",
+    "v2",
+    "v2"
+  ],
+  "score_mat": [
+    "v3",
+    "v3"
+  ],
+  "split_pre_post": [
+    "v4",
+    "v4",
+    "v5",
+    "v5"
+  ],
+  "swa_cache_insert_valid_bias": [
+    "v1",
+    "v1",
+    "v5",
+    "v5"
+  ],
+  "swa_gather_kv": [
+    "v1",
+    "v1"
+  ],
+  "swa_rope_step": [
+    "v1",
+    "v1",
+    "v2",
+    "v2"
+  ],
+  "route_hash": [
+    "v4",
+    "v4",
+    "v5",
+    "v5"
+  ],
+  "prefill_c4_kv_score_proj": [
+    "v4",
+    "v5"
+  ],
+  "prefill_c4_write_map": [
+    "v3",
+    "v3",
+    "v4",
+    "v4"
+  ],
+  "prefill_c4_softmax_pool": [
+    "v9",
+    "v9"
+  ],
+  "prefill_c4_rmsnorm_rope": [
+    "v6",
+    "v6"
+  ],
+  "prefill_c4_cache_write": [
+    "v1",
+    "v1"
+  ],
+  "prefill_c4_state_update": [
+    "v4",
+    "v4"
+  ],
+  "prefill_csa_cache_write": [
+    "v1",
+    "v1"
+  ],
+  "prefill_csa_idx_halfrope": [
+    "v1",
+    "v1",
+    "v2",
+    "v2"
+  ],
+  "prefill_hca_c128_norm_pad_init": [
+    "v1",
+    "v1",
+    "v2",
+    "v2"
+  ],
+  "prefill_hca_c128_kv_score_proj": [
+    "v4",
+    "v5"
+  ],
+  "prefill_hca_c128_write_map": [
+    "v1",
+    "v1",
+    "v2",
+    "v2"
+  ],
+  "prefill_hca_c128_state_scatter_pre": [
+    "v4",
+    "v4"
+  ],
+  "prefill_hca_c128_softmax_pool": [
+    "v5",
+    "v5"
+  ],
+  "prefill_hca_c128_rmsnorm_rope": [
+    "v6",
+    "v6"
+  ],
+  "prefill_hca_c128_kv_finalize": [
+    "v2",
+    "v2"
+  ],
+  "prefill_hca_cache_write": [
+    "v1",
+    "v1"
+  ],
+  "prefill_idx_c4_kv_score_proj": [
+    "v4",
+    "v5"
+  ],
+  "prefill_idx_c4_write_map": [
+    "v3",
+    "v3",
+    "v4",
+    "v4"
+  ],
+  "prefill_idx_c4_softmax_pool": [
+    "v9",
+    "v9"
+  ],
+  "prefill_idx_c4_rmsnorm_rope": [
+    "v7",
+    "v7"
+  ],
+  "prefill_idx_c4_kv_hadamard": [
+    "v1",
+    "v1"
+  ],
+  "prefill_idx_c4_cache_write": [
+    "v2",
+    "v2",
+    "v4",
+    "v4"
+  ],
+  "prefill_idx_c4_state_update": [
+    "v6",
+    "v6"
+  ],
+  "prefill_idx_qr_proj": [
+    "v2",
+    "v2"
+  ],
+  "prefill_idx_qr_rope": [
+    "v3",
+    "v3"
+  ],
+  "prefill_idx_qr_hadamard_quant": [
+    "v1",
+    "v1",
+    "v2",
+    "v2"
+  ],
+  "prefill_idx_weights_proj": [
+    "v3",
+    "v3"
+  ],
+  "prefill_idx_score_init": [
+    "v1",
+    "v1"
+  ],
+  "prefill_idx_score": [
+    "v2",
+    "v2"
+  ],
+  "prefill_idx_score_out": [
+    "v2",
+    "v2"
+  ],
+  "prefill_idx_topk": [
+    "v1",
+    "v1"
+  ],
+  "build_bias": [
+    "v2",
+    "v2"
+  ],
+  "gather_kv": [
+    "v1",
+    "v1"
+  ],
+  "quant": [
+    "v1",
+    "v1",
+    "v2",
+    "v2"
+  ],
+  "weights_proj": [
+    "v3",
+    "v3"
+  ],
+  "weights_proj_reduce": [
+    "v2",
+    "v2"
+  ],
+  "idx_qr_proj_dequant": [
+    "v4",
+    "v4"
+  ],
+  "idx_qr_proj_matmul": [
+    "v1",
+    "v1"
+  ],
+  "qproj_matmul": [
+    "v4",
+    "v4"
+  ],
+  "qk_pv": [
+    "v3",
+    "v3",
+    "v4",
+    "v4",
+    "v5",
+    "v5"
+  ],
+  "qkv_rope_rows": [
+    "v4",
+    "v4",
+    "v5",
+    "v5"
+  ],
+  "qr_hadamard_matmul": [
+    "v3",
+    "v3"
+  ],
+  "qr_hadamard_quant": [
+    "v2",
+    "v2",
+    "v3",
+    "v3"
+  ],
+  "qr_proj_matmul": [
+    "v1",
+    "v1"
+  ],
+  "qr_proj_seed": [
+    "v1",
+    "v1"
+  ],
+  "qr_rms_norm_quant": [
+    "v3",
+    "v3",
+    "v4",
+    "v4",
+    "v5",
+    "v5"
+  ],
+  "qr_rope": [
+    "v4",
+    "v4"
+  ],
+  "kv_hadamard": [
+    "v2",
+    "v2"
+  ],
+  "kv_proj_matmul": [
+    "v1",
+    "v1"
+  ],
+  "kv_proj_seed": [
+    "v1",
+    "v1"
+  ],
+  "kv_rms_norm_rope": [
+    "v2",
+    "v2"
+  ],
+  "kv_and_cache_write": [
+    "v2",
+    "v2",
+    "v3",
+    "v3",
+    "v6",
+    "v6"
+  ],
+  "score_reduce": [
+    "v5",
+    "v5"
+  ],
+  "topk": [
+    "v3",
+    "v3"
+  ],
+  "mtp_projection_linear": [
+    "v7",
+    "v7"
+  ],
+  "mtp_projection_norm": [
+    "v3",
+    "v3",
+    "v5",
+    "v5",
+    "v12",
+    "v12"
+  ],
+  "mtp_projection_output": [
+    "v2",
+    "v2"
+  ],
+  "mtp_projection_quant": [
+    "v2",
+    "v2",
+    "v3",
+    "v3",
+    "v5",
+    "v5",
+    "v6",
+    "v6"
+  ],
+  "mtp_projection_rms": [
+    "v2",
+    "v2",
+    "v3",
+    "v3",
+    "v4",
+    "v4"
+  ],
+  "rmsnorm_rope": [
+    "v2",
+    "v2"
+  ],
+  "rmsnorm_rope_cache_write": [
+    "v2",
+    "v2"
+  ]
+}

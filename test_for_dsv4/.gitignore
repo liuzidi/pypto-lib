@@ -1,0 +1,12 @@
+# Run outputs (regenerated each sweep)
+sweep_results.csv
+sweep_results_*.csv
+emitc_sweep_results.csv
+crash_diagnosis.json
+vmi_sweep_*.json
+
+# Build artifacts
+build_output/
+run_all_build/
+__pycache__/
+*.pyc

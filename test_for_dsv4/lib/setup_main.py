@@ -1,0 +1,1 @@
+../../.claude/skills/vpto-board-validate/lib/setup_main.py
