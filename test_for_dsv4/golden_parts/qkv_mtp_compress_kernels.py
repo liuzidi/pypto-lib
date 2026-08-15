@@ -563,7 +563,10 @@ def build_kv_rms_norm_rope(meta, generator, ints):
     #      rotation (passing the raw uint16 storage to apply_interleaved_rope
     #      would treat the bit patterns as large integers).
     def _rms_norm_rope(rows, cos_rows, sin_rows):
-        sq = (rows[:, :NOPE_DIM] * rows[:, :NOPE_DIM]).sum(axis=1, keepdims=True) / HEAD_DIM
+        # Kernel sums x^2 over ALL HEAD_DIM columns (not just NOPE_DIM).
+        # The .pto loop iterates kb 0..8 step 2, each loading 2x 8x64 tiles
+        # = 128 cols per iter, 4 iters = 512 = HEAD_DIM.
+        sq = (rows * rows).sum(axis=1, keepdims=True) / HEAD_DIM
         inv_rms = 1.0 / np.sqrt(sq + EPS)
         normed = rows * inv_rms * g                                # [n, HEAD_DIM]
         nope = normed[:, :NOPE_DIM]

@@ -84,7 +84,7 @@ def run_emitc_kernel(kernel: str, device: int, timeout: int = 300) -> dict:
 
     # Source env
     env_cmd = f"source {VPTO_ENV_SH} 2>/dev/null"
-    ptoas_bin = _env("PTOAS_BIN") or "/data/liuzidi/PTOAS/build311/tools/ptoas/ptoas"
+    ptoas_bin = _env("PTOAS_BIN") or "/data/liuzidi/PTOAS/build/tools/ptoas/ptoas"
     bisheng = _env("BISHENG_BIN") or f"{_env('ASCEND_HOME_PATH')}/bin/bisheng"
     ascend = _env("ASCEND_HOME_PATH") or "/usr/local/Ascend/cann-9.1.0-beta.3"
     pto_isa = _env("PTO_ISA_PATH") or "/data/liuzidi/pto-isa"
@@ -269,10 +269,13 @@ if __name__ == "__main__":
         ptoas_bin,
         "--pto-arch=a5", "--pto-level=level3", "--pto-backend=emitc",
         "--enable-insert-sync",
+        "--enable-op-fusion=false",
         str(pto_preprocessed), "-o", str(kernel_cpp),
     ]
     daemon_env = dict(os.environ)
-    daemon_env["PYTHONPATH"] = f"/tmp/mlir_core_vmi:{tilelang_pkg}"
+    # ptoas 0.59+ bundles mlir + ptodsl internally; just need build/python on PYTHONPATH
+    ptoas_source = _env("PTOAS_SOURCE") or "/data/liuzidi/PTOAS"
+    daemon_env["PYTHONPATH"] = f"{ptoas_source}/build/python:{ptoas_source}/ptodsl"
     daemon_env["ASCEND_HOME_PATH"] = ascend
 
     r = subprocess.run(ptoas_cmd, capture_output=True, text=True, timeout=timeout,

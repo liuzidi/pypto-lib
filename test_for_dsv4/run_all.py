@@ -41,9 +41,9 @@ def find_kernels() -> list:
         text = p.read_text()
         func_names = re.findall(r'func\.func\s+@(\w+)', text)
         if len(func_names) > 1 and any(fn.endswith("_aic") for fn in func_names):
-            # Split kernel: add both _aic and _aiv variants
-            for fn in func_names:
-                kernels.append(fn)
+            # Split kernel (_aic/_aiv): unsupported, skip both variants
+            print(f"  [skip] {p.stem}: split kernel (_aic/_aiv) — unsupported")
+            continue
         else:
             kernels.append(p.stem)
     return kernels

@@ -546,21 +546,26 @@ def build_prefill_c4_cache_write(meta, generator, ints):
 
 
 def build_prefill_c4_state_update(meta, generator, ints):
-    """Write per-token raw projections (+APE on score) into paged compress_state."""
+    """Write per-token raw projections (+APE on score) into paged compress_state.
+
+    .pto args:
+      v1: state_slot_mapping [T] i64
+      v2: position_ids [T] i32
+      v3: pooled_kv [32, 512] f32 (input, kernel reads)
+      v4: compress_state_flat [260, 2048] f32 (in/out)
+      v5: cmp_ape [4, 1024] f32 (input, kernel reads)
+      v6: kv_proj_scratch [T, 1024] f32 (input, kernel reads)
+      v7: score_proj_scratch [T, 1024] f32 (input, kernel reads)
+    """
     del ints
     buffers = {
         "v1": _flat_output(meta, "v1"),     # state_slot_mapping [T] i64
         "v2": _flat_output(meta, "v2", fallback_count=T),  # position_ids [T]
-        "v3": make_fp32(generator, meta.elem_counts.get("v3", 0), scale=0.05),    # cmp_ape
+        "v3": make_fp32(generator, meta.elem_counts.get("v3", 0), scale=0.05),    # pooled_kv
         "v4": _flat_output(meta, "v4"),     # compress_state_flat (in/out)
-        "v3": make_fp32(generator, C4_COMPRESS_RATIO * C4_OUT_DIM, scale=0.05),    # cmp_ape [4, 1024]
-        "v4": _flat_output(meta, "v4"),
-        "v5": _flat_output(meta, "v5"),
+        "v5": make_fp32(generator, C4_COMPRESS_RATIO * C4_OUT_DIM, scale=0.05),    # cmp_ape [4, 1024]
         "v6": make_fp32(generator, T * C4_OUT_DIM, scale=0.05),    # kv_proj_scratch [T, 1024]
         "v7": make_fp32(generator, T * C4_OUT_DIM, scale=0.05),    # score_proj_scratch [T, 1024]
-        "v8": _flat_output(meta, "v8"),
-        "v9": _flat_output(meta, "v9"),
-        "v10": _flat_output(meta, "v10"),
     }
     # benign state_slot_mapping: every token t maps to state row for position t
     state_block_table = (np.arange(CSA_STATE_MAX_BLOCKS, dtype=np.int32) * 17 + 3) % CSA_STATE_PHYSICAL_BLOCKS
@@ -570,7 +575,7 @@ def build_prefill_c4_state_update(meta, generator, ints):
     buffers["v1"][:] = state_slot
     buffers["v2"][:] = np.arange(T, dtype=np.int32)
     compress_state_flat = buffers["v4"].reshape(CSA_STATE_PHYSICAL_BLOCKS * CSA_STATE_BLOCK_SIZE, C4_COMPRESS_STATE_DIM).copy()
-    cmp_ape = buffers["v3"].reshape(C4_COMPRESS_RATIO, C4_OUT_DIM)
+    cmp_ape = buffers["v5"].reshape(C4_COMPRESS_RATIO, C4_OUT_DIM)
     kv_proj = buffers["v6"].reshape(T, C4_OUT_DIM)
     score_proj = buffers["v7"].reshape(T, C4_OUT_DIM)
     for t in range(T):
@@ -580,12 +585,7 @@ def build_prefill_c4_state_update(meta, generator, ints):
         pos = t
         ape_slot = pos % C4_COMPRESS_RATIO
         compress_state_flat[dst, :C4_OUT_DIM] = kv_proj[t]
-        # The NPU kernel skips the cmp_ape addition for the very first token
-        # (pos == 0); for all later tokens it adds cmp_ape[ape_slot].
-        if pos > 0:
-            compress_state_flat[dst, C4_OUT_DIM:C4_COMPRESS_STATE_DIM] = score_proj[t] + cmp_ape[ape_slot]
-        else:
-            compress_state_flat[dst, C4_OUT_DIM:C4_COMPRESS_STATE_DIM] = score_proj[t]
+        compress_state_flat[dst, C4_OUT_DIM:C4_COMPRESS_STATE_DIM] = score_proj[t] + cmp_ape[ape_slot]
     buffers["v4"][:] = compress_state_flat.reshape(-1)
     return buffers, {"v4": buffers["v4"]}
 
@@ -1202,19 +1202,26 @@ def build_prefill_idx_c4_cache_write(meta, generator, ints):
 
 
 def build_prefill_idx_c4_state_update(meta, generator, ints):
-    """Write per-token raw projections (+APE on score) into paged inner state."""
+    """Write per-token raw projections (+APE on score) into paged inner state.
+
+    .pto args:
+      v1: inner_state_slot_mapping [T] i64
+      v2: position_ids [T] i32
+      v3: inner_ape [4, 256] f32 (input, kernel reads)
+      v4: pooled_kv [32, 128] f32 (input, kernel reads but multiplies by 0)
+      v5: kv_proj_scratch [T, 256] f32 (input, kernel reads)
+      v6: compress_state_flat [260, 512] f32 (in/out — OUTPUT)
+      v7: score_proj_scratch [T, 256] f32 (input, kernel reads)
+    """
     del ints
     buffers = {
         "v1": _flat_output(meta, "v1"),     # inner_state_slot_mapping [T] i64
         "v2": _flat_output(meta, "v2", fallback_count=T),  # position_ids [T]
         "v3": make_fp32(generator, meta.elem_counts.get("v3", 0), scale=0.05),    # inner_ape
-        "v4": _flat_output(meta, "v4"),      # compress_state_flat (in/out, v4 in .pto is the small ape? actually v4=4096)
+        "v4": _flat_output(meta, "v4"),      # pooled_kv (kernel multiplies by 0, zeros OK)
         "v5": make_fp32(generator, meta.elem_counts.get("v5", 0), scale=0.05),    # kv_proj_scratch
         "v6": _flat_output(meta, "v6"),      # compress_state_flat (in/out)
         "v7": make_fp32(generator, meta.elem_counts.get("v7", 0), scale=0.05),    # score_proj_scratch
-        "v8": _flat_output(meta, "v8"),
-        "v9": _flat_output(meta, "v9"),
-        "v10": _flat_output(meta, "v10"),
     }
     state_block_table = (np.arange(IDX_INNER_STATE_MAX_BLOCKS, dtype=np.int32) * 17 + 3) % CSA_INNER_STATE_PHYSICAL_BLOCKS
     state_slot = np.full(T, -1, dtype=np.int64)
