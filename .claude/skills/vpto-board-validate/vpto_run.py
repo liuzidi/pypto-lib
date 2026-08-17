@@ -553,13 +553,44 @@ if __name__ == "__main__":
     # --- 4. ptoas VPTO -> fatobj ---
     fatobj = build_root / f"{kernel}.o"
     daemon_env = dict(cann_env)
-    # ptoas 0.59+ bundles mlir inside its package and runs ptodsl in-process
-    # (no daemon socket). The PYTHONPATH just needs ptodsl + the build's python
-    # root so the wrapper's sys.path entries survive subprocess inheritance.
+    # ptoas 0.59+ runs ptodsl in-process (no daemon socket). The PYTHONPATH it
+    # inherits must let the in-process ptodsl import mlir.ir + the PTO dialect
+    # + ptodsl. See scripts/vpto_env.sh for the full rationale. Summary:
+    #   - The pip-installed wheel entry (~/.local/bin/ptoas) is SELF-CONTAINED:
+    #     it has ir.py, _mlir.so, _mlirRegisterEverything.so, etc. It must NOT
+    #     inherit a PYTHONPATH that points at build/python, because that would
+    #     shadow the wheel's complete ptoas package with the build-tree's
+    #     PARTIAL ptoas package (no ir.py) and crash with
+    #     "ModuleNotFoundError: No module named 'ptoas.mlir.ir'".
+    #   - The build-tree wrapper ($PTOAS_SOURCE/build/tools/ptoas/ptoas) IS
+    #     partial and needs three roots on PYTHONPATH: build/python (ptoas +
+    #     _core.so + PTO dialect), the /tmp/mlir_core_vmi overlay (mlir.ir +
+    #     _mlir.so matching the build), and ptodsl.
+    # Detect which ptoas we have by checking if the resolved binary lives in
+    # the PTOAS source tree's build/tools dir (build-tree wrapper) vs elsewhere
+    # (wheel entry, /usr/local/bin, etc.).
+    ptoas_bin_resolved = os.path.realpath(ptoas_bin)
+    _is_build_tree_wrapper = ptoas_bin_resolved.startswith(
+        os.path.realpath(f"{ptoas_source}/build/") + "/")
     ptoas_ver_line = subprocess.run(
         [ptoas_bin, "--version"], capture_output=True, text=True).stdout.strip()
-    if ptoas_ver_line >= "ptoas 0.59":
-        daemon_env["PYTHONPATH"] = f"{ptoas_source}/build/python:{ptoas_source}/ptodsl"
+    if ptoas_ver_line >= "ptoas 0.59" and not _is_build_tree_wrapper:
+        # Wheel entry: self-contained. Do NOT override PYTHONPATH — let the
+        # wheel's own site-packages entry resolve ptoas + mlir. Only add
+        # ptodsl to the front so the in-process DSL can find the CLI source
+        # tree (ptodsl has no _core.so, so it won't shadow the wheel).
+        _existing = daemon_env.get("PYTHONPATH", "")
+        daemon_env["PYTHONPATH"] = os.pathsep.join(
+            p for p in [f"{ptoas_source}/ptodsl", _existing] if p)
+    elif ptoas_ver_line >= "ptoas 0.59":
+        # Build-tree wrapper: needs the 3-root overlay PYTHONPATH.
+        _mlir_core_vmi = "/tmp/mlir_core_vmi"
+        daemon_env["PYTHONPATH"] = os.pathsep.join(
+            p for p in [
+                f"{ptoas_source}/build/python",
+                _mlir_core_vmi if os.path.isdir(f"{_mlir_core_vmi}/mlir") else "",
+                f"{ptoas_source}/ptodsl",
+            ] if p)
     else:
         daemon_env["PYTHONPATH"] = f"/tmp/mlir_core_vmi:{ptoas_source}/ptodsl"
     # clear stale daemon state
