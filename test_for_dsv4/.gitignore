@@ -5,6 +5,10 @@ emitc_sweep_results.csv
 crash_diagnosis.json
 vmi_sweep_*.json
 
+# Stray partial run outputs (e.g. interrupted sweeps)
+*.csv.tmp
+*.csv.prev_partial
+
 # Build artifacts
 build_output/
 run_all_build/

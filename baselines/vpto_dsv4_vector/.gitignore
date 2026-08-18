@@ -1,0 +1,3 @@
+# Stray partial sweep outputs (e.g. interrupted runs)
+*.csv.prev_partial
+*.csv.tmp

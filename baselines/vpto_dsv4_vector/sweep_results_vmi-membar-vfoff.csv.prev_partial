@@ -1,7 +1,0 @@
-kernel,module,route,mode,device,pass,compare_status,exit_code,max_diff,n_over,n_total,threshold,timing_ms,rtol,atol,fatobj_bytes,has_kernel_sym,has_ctor,nested_elf_offsets,error
-comb_sinkhorn,hc_pre,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-hc_pre_linear,hc_pre,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,5920,True,True,"[0, 296]",NPU run failed (exit 1)
-hc_pre_rms,hc_pre,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,8920,True,True,"[0, 288]",NPU run failed (exit 1)
-hc_pre_seed,hc_pre,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.536,0.005,0.005,5104,True,True,"[0, 264]",
-mix_x,hc_pre,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,8992,True,True,"[0, 288]",NPU run failed (exit 1)
-split_pre_post,hc_pre,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,7808,True,True,"[0, 312]",NPU run failed (exit 1)
