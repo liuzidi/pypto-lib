@@ -140,21 +140,82 @@ for k in ("aiv_vec_time(us)", "aiv_total_cycles", "aiv_scalar_time(us)",
 PY
 ```
 
-## 6. Verified example: `qr_proj_seed` (2026-08-12)
+## 6. `qr_proj_seed` case study — and why you must verify (2026-08-12)
 
-| metric | baseline | vmi-membar-vfoff | delta |
+> **This section documents a false positive.** The initial msprof run
+> appeared to show VMI eliminating VEC compute (`aiv_vec_time` 4.07 µs →
+> 0.00 µs). Binary-level verification proved the kernel machine code is
+> identical between routes — the msprof numbers were a sampling artifact.
+
+### 6.1 The false positive
+
+First msprof run (both with `--warm-up=0`):
+
+| metric | baseline | vmi-membar-vfoff | appeared to show |
 |---|---:|---:|---|
-| Task Duration | 27.69 µs | 1.35 µs | -95.1% |
-| **aiv_vec_time (VEC only)** | **4.07 µs** | **0.00 µs** | **-100%** |
-| aiv_total_cycles | 43,664 | 424 | -99.0% |
-| aiv_scalar_time | 0.96 µs | 0.23 µs | -75.7% |
-| aiv_mte3_time (store) | 20.96 µs | 0.00 µs | -100% |
-| aiv_vec_ratio | 15.4% | 0.0% | VEC eliminated |
+| Task Duration | 27.69 µs | 1.35 µs | -95% |
+| aiv_vec_time | 4.07 µs | 0.00 µs | VEC eliminated |
+| aiv_total_cycles | 43,664 | 424 | -99% |
 
-VMI+membar route eliminated VEC compute entirely for this kernel — the work
-moved to scalar pipe (`aiv_scalar_ratio` 3.6%→90.6%) and MTE3 stores were
-fused away. This is the VF-fusion benefit visible only via PMU, invisible in
-host-side wall-clock timing.
+### 6.2 The verification that caught the error
+
+**Step 1 — compare device kernel binary across routes:**
+
+```bash
+# Extract nested AICore ELF from each fatobj, compare .text section
+.venv/bin/python3 - <<'PY'
+import re, hashlib
+for route, path in [("baseline", "build_output/vpto_qr_proj_seed/qr_proj_seed.o"),
+                    ("vmi", "build_output/vpto_qr_proj_seed_vmi/qr_proj_seed.o")]:
+    data = open(path, "rb").read()
+    offsets = [m.start() for m in re.finditer(b"\x7fELF", data)]
+    elf = data[offsets[1]:]  # ELF[1] = AICore kernel
+    # .text is at offset 0x100, size from section header
+    text = elf[0x100:0x100+552]
+    print(f"{route}: .text md5={hashlib.md5(text).hexdigest()}")
+PY
+# Result: both md5 = d4b905a3f73e  ← IDENTICAL
+```
+
+Also confirmed: bisheng-linked `.so` md5 identical; msprof-dumped
+`aicore_binary.o` (device-executed binary) md5 identical across routes.
+
+**Step 2 — run msprof multiple times with warm-up:**
+
+| run | warm-up | freq (MHz) | aiv_vec_time | aiv_total_cycles |
+|---|---:|---:|---:|---:|
+| baseline r1 | 3 | 1650 | 4.07 µs | 43714 |
+| baseline r2 | 3 | **875** | 7.68 µs | 38852 |
+| baseline orig | 0 | 1650 | 4.07 µs | 43664 |
+| vmi orig | 0 | 1650 | **0.00 µs** | **424** |
+| vmi r1 | 0 | **875** | **0.00 µs** | **661** |
+
+### 6.3 Root cause of the false positive
+
+Two problems compounded:
+
+1. **`--warm-up=0` caused msprof to sample a launch placeholder task**
+   instead of the real kernel execution. The VMI runs reported
+   `aiv_total_cycles = 424/661` — impossible for a 552-byte `.text`
+   (baseline shows ~43700 cycles). The sampling window truncated.
+
+2. **NPU frequency instability**: some runs hit 875 MHz instead of 1650
+   (nearly 2× slower). `Current Freq` in `OpBasicInfo.csv` must be
+   checked before comparing absolute cycle/time numbers.
+
+### 6.4 Lessons (apply to every msprof run)
+
+- **Always set `--warm-up≥3`** so the device reaches steady state.
+- **Run at least 3 times** and take the median (or check variance).
+- **Check `Current Freq`** in `OpBasicInfo.csv` — if it's below `Rated
+  Freq`, the run hit thermal throttling or power capping. Discard or
+  normalize.
+- **Sanity-check `aiv_total_cycles`** against the `.text` section size
+  — a 552-byte kernel reporting <1000 cycles almost certainly wasn't
+  sampled correctly.
+- **Verify codegen difference before trusting PMU difference**: if
+  the device binary (msprof dump `aicore_binary.o`) is byte-identical
+  across routes, any PMU difference is sampling noise, not codegen.
 
 ## 7. Limitations
 
@@ -168,11 +229,19 @@ host-side wall-clock timing.
   collects system-level data, less precise per-kernel.
 - **`--aic-mode` not available in `msprof op`**: task-based is the default;
   do not pass `--aic-mode=task-based` (it errors).
+- **Sampling artifacts on short kernels**: `--warm-up=0` can produce
+  `aiv_vec_time=0` and `aiv_total_cycles` orders of magnitude too low for
+  sub-10 µs kernels. See §6 for a documented case. Always use
+  `--warm-up≥3`, run multiple times, check `Current Freq`, and sanity-check
+  cycle counts.
+- **Frequency instability**: the A5 can drop from 1650 MHz to 875 MHz
+  between runs (thermal/power). Compare `Current Freq` in
+  `OpBasicInfo.csv`; normalize or discard throttled runs.
 
 ## 8. Related
 
-- `PRECISION_REPORT.md` §10 — VMI+membar route comparison (precision +
-  stability); this doc adds the **performance** dimension.
+- `PRECISION_REPORT.md` §10.7 — the full verification of the
+  `qr_proj_seed` false positive (binary comparison + multi-run PMU data).
 - `incore-profiling` skill — the **simulator** path (`msprof op simulator`),
   no NPU needed but approximate. This doc is the **real-silicon** path.
 - `BASELINE_COMPARISON.md` — earlier manual msprof runs (app mode, less

@@ -1,342 +1,292 @@
 kernel,module,route,mode,device,pass,compare_status,exit_code,max_diff,n_over,n_total,threshold,timing_ms,rtol,atol,fatobj_bytes,has_kernel_sym,has_ctor,nested_elf_offsets,error
-comb_sinkhorn,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,13472,True,True,"[0, 312]",NPU run failed (exit 1)
-csa_cache_writeback,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,6.355,0.005,0.005,5448,True,True,"[0, 288]",
-csa_cmp_rope,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,5712,True,True,"[0, 280]",NPU run failed (exit 1)
-csa_rope_step,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,7768,True,True,"[0, 280]",NPU run failed (exit 1)
-csa_slots_build_valid_qk_plan,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,14120,True,True,"[0, 296]",NPU run failed (exit 1)
-hc_post,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.682,0.005,0.005,6968,True,True,"[0, 288]",
-hc_pre_linear,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,5920,True,True,"[0, 296]",NPU run failed (exit 1)
-hc_pre_rms,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,8920,True,True,"[0, 288]",NPU run failed (exit 1)
-hc_pre_seed,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.462,0.005,0.005,5104,True,True,"[0, 264]",
-idx_qr_proj_dequant,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,6776,True,True,"[0, 304]",NPU run failed (exit 1)
-idx_qr_proj_matmul,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-kv_and_cache_write,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-kv_hadamard,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.767,0.005,0.005,4728,True,True,"[0, 264]",
-kv_proj_matmul,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,6088,True,True,"[0, 296]",NPU run failed (exit 1)
-kv_proj_seed,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,2.53,0.005,0.005,4960,True,True,"[0, 248]",
-kv_rms_norm_rope,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-kv_score_proj,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,6024,True,True,"[0, 296]",NPU run failed (exit 1)
-kv_score_proj_0,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,5768,True,True,"[0, 296]",NPU run failed (exit 1)
-kv_touch,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,harvest failed: no dump records for kernel kv_touch (fid 37)
-merge_norm,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.58,0.005,0.005,10056,True,True,"[0, 288]",
-mix_x,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,8992,True,True,"[0, 288]",NPU run failed (exit 1)
-proj_a_mm,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,,,,,0.449,0.005,0.005,6008,True,True,"[0, 288]",
-proj_b_act,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,8256,True,True,"[0, 288]",NPU run failed (exit 1)
-proj_b_mm,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-q_rope_prepare,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qk_pv_aic,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qk_pv_aiv,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qproj_dequant_rms_nope_rope,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qproj_matmul,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qr_hadamard_matmul,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,4960,True,True,"[0, 280]",NPU run failed (exit 1)
-qr_hadamard_quant,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qr_proj_matmul,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,6040,True,True,"[0, 296]",NPU run failed (exit 1)
-qr_proj_seed,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.592,0.005,0.005,4960,True,True,"[0, 248]",
-qr_rms_norm_quant,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qr_rope,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-quant,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rms_norm,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,9080,True,True,"[0, 272]",NPU run failed (exit 1)
-rmsnorm_rope,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rmsnorm_rope_cache_write,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rope_cs,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-scatter_softmax_pool,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,10688,True,True,"[0, 288]",NPU run failed (exit 1)
-scatter_softmax_pool_0,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,10984,True,True,"[0, 288]",NPU run failed (exit 1)
-score_mat,attention_csa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-score_reduce,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,8352,True,True,"[0, 312]",NPU run failed (exit 1)
-split_pre_post,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,7808,True,True,"[0, 312]",NPU run failed (exit 1)
-topk,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,7512,True,True,"[0, 288]",NPU run failed (exit 1)
-weights_proj,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,5184,True,True,"[0, 280]",NPU run failed (exit 1)
-weights_proj_reduce,attention_csa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,5928,True,True,"[0, 256]",NPU run failed (exit 1)
-attention_hca,attention_hca,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,"capture failed (exit 1): oes not dominate this use
-  -------------+--------------------------------------------------------------
-
-  Full details: build_output/_jit_attention_hca_test_20260812_031031/report/codegen_errors.txt"
-comb_sinkhorn,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,13472,True,True,"[0, 312]",NPU run failed (exit 1)
-hc_post,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.682,0.005,0.005,6968,True,True,"[0, 288]",
-hc_pre_linear,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,5920,True,True,"[0, 296]",NPU run failed (exit 1)
-hc_pre_rms,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,8920,True,True,"[0, 288]",NPU run failed (exit 1)
-hc_pre_seed,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.543,0.005,0.005,5104,True,True,"[0, 264]",
-kv_proj_matmul,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,6088,True,True,"[0, 296]",NPU run failed (exit 1)
-kv_proj_seed,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.512,0.005,0.005,4960,True,True,"[0, 248]",
-kv_rms_norm_rope,attention_swa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-merge_norm,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.58,0.005,0.005,10056,True,True,"[0, 288]",
-mix_x,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,8992,True,True,"[0, 288]",NPU run failed (exit 1)
-proj_a_mm,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,,,,,0.531,0.005,0.005,6008,True,True,"[0, 288]",
-proj_b_act,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,8256,True,True,"[0, 288]",NPU run failed (exit 1)
-proj_b_mm,attention_swa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-q_rope_prepare,attention_swa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qk_pv_aic,attention_swa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qk_pv_aiv,attention_swa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qproj_dequant_rms_nope_rope,attention_swa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qproj_matmul,attention_swa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qr_proj_matmul,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,6040,True,True,"[0, 296]",NPU run failed (exit 1)
-qr_proj_seed,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.519,0.005,0.005,4960,True,True,"[0, 248]",
-qr_rms_norm_quant,attention_swa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-quant,attention_swa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rms_norm,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,9080,True,True,"[0, 272]",NPU run failed (exit 1)
-rope_cs,attention_swa,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-split_pre_post,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,7808,True,True,"[0, 312]",NPU run failed (exit 1)
-swa_cache_insert_valid_bias,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,7016,True,True,"[0, 296]",NPU run failed (exit 1)
-swa_gather_kv,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,5640,True,True,"[0, 280]",NPU run failed (exit 1)
-swa_rope_step,attention_swa,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,6336,True,True,"[0, 280]",NPU run failed (exit 1)
-kv_score_proj,compressor,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,6024,True,True,"[0, 296]",NPU run failed (exit 1)
-rmsnorm_rope_cache_write,compressor,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-scatter_softmax_pool,compressor,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,10688,True,True,"[0, 288]",NPU run failed (exit 1)
-idx_qr_proj_dequant,indexer,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,6776,True,True,"[0, 304]",NPU run failed (exit 1)
-idx_qr_proj_matmul,indexer,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-kv_and_cache_write,indexer,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-kv_hadamard,indexer,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.571,0.005,0.005,4728,True,True,"[0, 264]",
-kv_score_proj,indexer,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,5744,True,True,"[0, 296]",NPU run failed (exit 1)
-qr_hadamard_matmul,indexer,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,4960,True,True,"[0, 280]",NPU run failed (exit 1)
-qr_hadamard_quant,indexer,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qr_rope,indexer,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rmsnorm_rope,indexer,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-scatter_softmax_pool,indexer,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,10936,True,True,"[0, 288]",NPU run failed (exit 1)
-score_mat,indexer,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-score_reduce,indexer,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,8352,True,True,"[0, 312]",NPU run failed (exit 1)
-topk,indexer,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,7512,True,True,"[0, 288]",NPU run failed (exit 1)
-weights_proj,indexer,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,5184,True,True,"[0, 280]",NPU run failed (exit 1)
-weights_proj_reduce,indexer,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,5928,True,True,"[0, 256]",NPU run failed (exit 1)
-kv_and_cache_write,indexer_compressor,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-kv_hadamard,indexer_compressor,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.434,0.005,0.005,4728,True,True,"[0, 264]",
-kv_score_proj,indexer_compressor,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,5744,True,True,"[0, 296]",NPU run failed (exit 1)
-rmsnorm_rope,indexer_compressor,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-scatter_softmax_pool,indexer_compressor,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,10936,True,True,"[0, 288]",NPU run failed (exit 1)
-csa_slots_build_valid_qk_plan,sparse_attn,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,14120,True,True,"[0, 296]",NPU run failed (exit 1)
-kv_touch,sparse_attn,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,harvest failed: no dump records for kernel kv_touch (fid 0)
-merge_norm,sparse_attn,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.58,0.005,0.005,10056,True,True,"[0, 288]",
-proj_a_mm,sparse_attn,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,,,,,0.533,0.005,0.005,6008,True,True,"[0, 288]",
-proj_b_act,sparse_attn,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,8256,True,True,"[0, 288]",NPU run failed (exit 1)
-proj_b_mm,sparse_attn,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qk_pv_aic,sparse_attn,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qk_pv_aiv,sparse_attn,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-quant,sparse_attn,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rope_cs,sparse_attn,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-ffn_norm,gate,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-gate_aic,gate,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-gate_aiv,gate,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-gate_pre_route,gate,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,harvest failed: no dump records for kernel gate_pre_route (fid 2)
-route_hash,gate,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-x_norm_quant,gate,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-hc_head_linear,hc_head,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,5784,True,True,"[0, 296]",NPU run failed (exit 1)
-hc_head_pre_fused,hc_head,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-hc_head_reduce,hc_head,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,10264,True,True,"[0, 280]",NPU run failed (exit 1)
-hc_head_rms,hc_head,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,7480,True,True,"[0, 280]",NPU run failed (exit 1)
-hc_head_seed,hc_head,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,harvest failed: no dump records for kernel hc_head_seed (fid 1)
-hc_post,hc_post,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.682,0.005,0.005,6968,True,True,"[0, 288]",
-comb_sinkhorn,hc_pre,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,13600,True,True,"[0, 312]",NPU run failed (exit 1)
-hc_pre_linear,hc_pre,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,5920,True,True,"[0, 296]",NPU run failed (exit 1)
-hc_pre_rms,hc_pre,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,8920,True,True,"[0, 288]",NPU run failed (exit 1)
-hc_pre_seed,hc_pre,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,2.303,0.005,0.005,5104,True,True,"[0, 264]",
-mix_x,hc_pre,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,9128,True,True,"[0, 288]",NPU run failed (exit 1)
-split_pre_post,hc_pre,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,7944,True,True,"[0, 328]",NPU run failed (exit 1)
-mtp_projection_linear_aic,mtp_projection,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-mtp_projection_linear_aiv,mtp_projection,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-mtp_projection_norm,mtp_projection,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,10680,True,True,"[0, 336]",NPU run failed (exit 1)
-mtp_projection_output,mtp_projection,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.508,0.005,0.005,5888,True,True,"[0, 288]",
-mtp_projection_quant,mtp_projection,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-mtp_projection_rms,mtp_projection,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,1000.0,8,16,0.005,0.647,0.005,0.005,9272,True,True,"[0, 280]",
-kv_proj_matmul,qkv_proj_rope,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,6088,True,True,"[0, 296]",NPU run failed (exit 1)
-kv_proj_seed,qkv_proj_rope,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.625,0.005,0.005,4960,True,True,"[0, 248]",
-kv_rms_norm_rope,qkv_proj_rope,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-q_rope_prepare,qkv_proj_rope,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qproj_dequant_rms_nope_rope,qkv_proj_rope,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qproj_matmul,qkv_proj_rope,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qr_proj_matmul,qkv_proj_rope,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,6040,True,True,"[0, 296]",NPU run failed (exit 1)
-qr_proj_seed,qkv_proj_rope,vpto(phase5)[vmi-membar-vfoff],decode,0,True,pass,0,0.0,,,0.005,0.626,0.005,0.005,4960,True,True,"[0, 248]",
-qr_rms_norm_quant,qkv_proj_rope,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rms_norm,rms_norm,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,9224,True,True,"[0, 288]",NPU run failed (exit 1)
-exp_gate_mm,expert_routed,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-exp_gate_up_act,expert_routed,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,9176,True,True,"[0, 312]",NPU run failed (exit 1)
-exp_h_q,expert_routed,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-exp_up_mm,expert_routed,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-exp_w2_act,expert_routed,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,8112,True,True,"[0, 288]",NPU run failed (exit 1)
-exp_w2_mm,expert_routed,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-sh_gate_mm,expert_shared,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-sh_gate_up_act_q,expert_shared,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-sh_up_mm,expert_shared,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-sh_w2_act,expert_shared,vpto(phase5)[vmi-membar-vfoff],decode,0,False,fail,1,,,,,,0.005,0.005,7912,True,True,"[0, 288]",NPU run failed (exit 1)
-sh_w2_mm,expert_shared,vpto(phase5),decode,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-build_bias,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6576,True,True,"[0, 272]",NPU run failed (exit 1)
-comb_sinkhorn,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,13472,True,True,"[0, 312]",NPU run failed (exit 1)
-gather_kv,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6560,True,True,"[0, 288]",NPU run failed (exit 1)
-hc_post_inactive_pad,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,harvest failed: no dump records for kernel hc_post_inactive_pad (fid 57)
-hc_post_prefill,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.643,0.005,0.005,7528,True,True,"[0, 312]",
-hc_pre_linear,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5920,True,True,"[0, 296]",NPU run failed (exit 1)
-hc_pre_rms,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,8920,True,True,"[0, 288]",NPU run failed (exit 1)
-hc_pre_seed,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.601,0.005,0.005,5104,True,True,"[0, 264]",
-kv_proj_matmul,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6088,True,True,"[0, 296]",NPU run failed (exit 1)
-kv_proj_seed,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.714,0.005,0.005,4960,True,True,"[0, 248]",
-kv_rms_norm_rope,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-merge_norm,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,11280,True,True,"[0, 288]",NPU run failed (exit 1)
-mix_x,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,8992,True,True,"[0, 288]",NPU run failed (exit 1)
-prefill_c4_cache_write,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5584,True,True,"[0, 288]",NPU run failed (exit 1)
-prefill_c4_kv_score_proj,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6808,True,True,"[0, 304]",NPU run failed (exit 1)
-prefill_c4_rmsnorm_rope,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_c4_softmax_pool,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,10184,True,True,"[0, 336]",NPU run failed (exit 1)
-prefill_c4_state_update,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,7504,True,True,"[0, 320]",NPU run failed (exit 1)
-prefill_c4_write_map,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5792,True,True,"[0, 288]",NPU run failed (exit 1)
-prefill_csa_cache_write,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.594,0.005,0.005,4600,True,True,"[0, 272]",
-prefill_csa_idx_halfrope,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6008,True,True,"[0, 288]",NPU run failed (exit 1)
-prefill_csa_sparse_idx_tile,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6672,True,True,"[0, 312]",NPU run failed (exit 1)
-prefill_idx_c4_cache_write,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_c4_kv_hadamard,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.534,0.005,0.005,5248,True,True,"[0, 288]",
-prefill_idx_c4_kv_score_proj,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6864,True,True,"[0, 312]",NPU run failed (exit 1)
-prefill_idx_c4_rmsnorm_rope,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_c4_softmax_pool,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,12112,True,True,"[0, 344]",NPU run failed (exit 1)
-prefill_idx_c4_state_update,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,7584,True,True,"[0, 328]",NPU run failed (exit 1)
-prefill_idx_c4_write_map,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5840,True,True,"[0, 288]",NPU run failed (exit 1)
-prefill_idx_qr_hadamard_quant_aic,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_qr_hadamard_quant_aiv,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_qr_proj_aic,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_qr_proj_aiv,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_qr_rope,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_score_aic,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_score_aiv,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_score_init,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,1.621,0.005,0.005,5200,True,True,"[0, 256]",
-prefill_idx_score_out,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,4360,True,True,"[0, 256]",NPU run failed (exit 1)
-prefill_idx_topk,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6176,True,True,"[0, 296]",NPU run failed (exit 1)
-prefill_idx_weights_proj_aic,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_weights_proj_aiv,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-proj_a_mm,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5752,True,True,"[0, 272]",NPU run failed (exit 1)
-proj_b_act,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,7632,True,True,"[0, 288]",NPU run failed (exit 1)
-proj_b_mm,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-q_rope_prepare,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qk_pv_aic,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qk_pv_aiv,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qkv_rope_rows,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5288,True,True,"[0, 296]",NPU run failed (exit 1)
-qproj_dequant_rms_nope_rope,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qproj_matmul,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qr_proj_matmul,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6040,True,True,"[0, 296]",NPU run failed (exit 1)
-qr_proj_seed,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.629,0.005,0.005,4960,True,True,"[0, 248]",
-qr_rms_norm_quant,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-quant,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rms_norm,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,9080,True,True,"[0, 272]",NPU run failed (exit 1)
-rope,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rope_cs,prefill_attention_csa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-split_pre_post,prefill_attention_csa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,7808,True,True,"[0, 312]",NPU run failed (exit 1)
-build_bias,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6576,True,True,"[0, 272]",NPU run failed (exit 1)
-comb_sinkhorn,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,13472,True,True,"[0, 312]",NPU run failed (exit 1)
-gather_kv,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6560,True,True,"[0, 288]",NPU run failed (exit 1)
-hc_post_inactive_pad,prefill_attention_hca,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,harvest failed: no dump records for kernel hc_post_inactive_pad (fid 38)
-hc_post_prefill,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.643,0.005,0.005,7528,True,True,"[0, 312]",
-hc_pre_linear,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5920,True,True,"[0, 296]",NPU run failed (exit 1)
-hc_pre_rms,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,8920,True,True,"[0, 288]",NPU run failed (exit 1)
-hc_pre_seed,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.559,0.005,0.005,5104,True,True,"[0, 264]",
-kv_proj_matmul,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6088,True,True,"[0, 296]",NPU run failed (exit 1)
-kv_proj_seed,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.679,0.005,0.005,4960,True,True,"[0, 248]",
-kv_rms_norm_rope,prefill_attention_hca,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-merge_norm,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,11280,True,True,"[0, 288]",NPU run failed (exit 1)
-mix_x,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,8992,True,True,"[0, 288]",NPU run failed (exit 1)
-prefill_hca_c128_kv_finalize,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5272,True,True,"[0, 280]",NPU run failed (exit 1)
-prefill_hca_c128_kv_score_proj,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6896,True,True,"[0, 312]",NPU run failed (exit 1)
-prefill_hca_c128_norm_pad_init,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.695,0.005,0.005,5128,True,True,"[0, 264]",
-prefill_hca_c128_rmsnorm_rope,prefill_attention_hca,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_hca_c128_softmax_pool,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,7272,True,True,"[0, 312]",NPU run failed (exit 1)
-prefill_hca_c128_state_scatter_pre,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6280,True,True,"[0, 312]",NPU run failed (exit 1)
-prefill_hca_c128_write_map,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5872,True,True,"[0, 288]",NPU run failed (exit 1)
-prefill_hca_cache_write,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.639,0.005,0.005,4600,True,True,"[0, 272]",
-prefill_hca_sparse_indices,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6192,True,True,"[0, 288]",NPU run failed (exit 1)
-proj_a_mm,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5752,True,True,"[0, 272]",NPU run failed (exit 1)
-proj_b_act,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,7632,True,True,"[0, 288]",NPU run failed (exit 1)
-proj_b_mm,prefill_attention_hca,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-q_rope_prepare,prefill_attention_hca,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qk_pv_aic,prefill_attention_hca,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qk_pv_aiv,prefill_attention_hca,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qkv_rope_rows,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5288,True,True,"[0, 296]",NPU run failed (exit 1)
-qproj_dequant_rms_nope_rope,prefill_attention_hca,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qproj_matmul,prefill_attention_hca,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qr_proj_matmul,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6040,True,True,"[0, 296]",NPU run failed (exit 1)
-qr_proj_seed,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.828,0.005,0.005,4960,True,True,"[0, 248]",
-qr_rms_norm_quant,prefill_attention_hca,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-quant,prefill_attention_hca,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rms_norm,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,9080,True,True,"[0, 272]",NPU run failed (exit 1)
-rope,prefill_attention_hca,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rope_cs,prefill_attention_hca,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-split_pre_post,prefill_attention_hca,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,7808,True,True,"[0, 312]",NPU run failed (exit 1)
-build_bias,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6576,True,True,"[0, 272]",NPU run failed (exit 1)
-comb_sinkhorn,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,13472,True,True,"[0, 312]",NPU run failed (exit 1)
-gather_kv,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6560,True,True,"[0, 288]",NPU run failed (exit 1)
-hc_post_inactive_pad,prefill_attention_swa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,harvest failed: no dump records for kernel hc_post_inactive_pad (fid 33)
-hc_post_prefill,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.643,0.005,0.005,7528,True,True,"[0, 312]",
-hc_pre_linear,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5920,True,True,"[0, 296]",NPU run failed (exit 1)
-hc_pre_rms,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,8920,True,True,"[0, 288]",NPU run failed (exit 1)
-hc_pre_seed,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.536,0.005,0.005,5104,True,True,"[0, 264]",
-kv_proj_matmul,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6088,True,True,"[0, 296]",NPU run failed (exit 1)
-kv_proj_seed,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.564,0.005,0.005,4960,True,True,"[0, 248]",
-kv_rms_norm_rope,prefill_attention_swa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-merge_norm,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,11280,True,True,"[0, 288]",NPU run failed (exit 1)
-mix_x,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,8992,True,True,"[0, 288]",NPU run failed (exit 1)
-prefill_swa_cache_write,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.592,0.005,0.005,4600,True,True,"[0, 272]",
-prefill_swa_dummy_cmp_table,prefill_attention_swa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_swa_empty_cmp_meta,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,4752,True,True,"[0, 256]",NPU run failed (exit 1)
-prefill_swa_window_indices,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5408,True,True,"[0, 288]",NPU run failed (exit 1)
-proj_a_mm,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5752,True,True,"[0, 272]",NPU run failed (exit 1)
-proj_b_act,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,7632,True,True,"[0, 288]",NPU run failed (exit 1)
-proj_b_mm,prefill_attention_swa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-q_rope_prepare,prefill_attention_swa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qk_pv_aic,prefill_attention_swa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qk_pv_aiv,prefill_attention_swa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qkv_rope_rows,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5288,True,True,"[0, 296]",NPU run failed (exit 1)
-qproj_dequant_rms_nope_rope,prefill_attention_swa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qproj_matmul,prefill_attention_swa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qr_proj_matmul,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6040,True,True,"[0, 296]",NPU run failed (exit 1)
-qr_proj_seed,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.628,0.005,0.005,4960,True,True,"[0, 248]",
-qr_rms_norm_quant,prefill_attention_swa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-quant,prefill_attention_swa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rms_norm,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,9080,True,True,"[0, 272]",NPU run failed (exit 1)
-rope,prefill_attention_swa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rope_cs,prefill_attention_swa,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-split_pre_post,prefill_attention_swa,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,7808,True,True,"[0, 312]",NPU run failed (exit 1)
-prefill_hca_c128_kv_finalize,prefill_compressor_ratio128,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5272,True,True,"[0, 280]",NPU run failed (exit 1)
-prefill_hca_c128_kv_score_proj,prefill_compressor_ratio128,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6896,True,True,"[0, 312]",NPU run failed (exit 1)
-prefill_hca_c128_norm_pad_init,prefill_compressor_ratio128,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.532,0.005,0.005,5128,True,True,"[0, 264]",
-prefill_hca_c128_rmsnorm_rope,prefill_compressor_ratio128,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_hca_c128_softmax_pool,prefill_compressor_ratio128,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,7272,True,True,"[0, 312]",NPU run failed (exit 1)
-prefill_hca_c128_state_scatter_pre,prefill_compressor_ratio128,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6144,True,True,"[0, 312]",NPU run failed (exit 1)
-prefill_hca_c128_write_map,prefill_compressor_ratio128,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5728,True,True,"[0, 288]",NPU run failed (exit 1)
-prefill_c4_cache_write,prefill_compressor_ratio4,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5584,True,True,"[0, 288]",NPU run failed (exit 1)
-prefill_c4_kv_score_proj,prefill_compressor_ratio4,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6808,True,True,"[0, 304]",NPU run failed (exit 1)
-prefill_c4_rmsnorm_rope,prefill_compressor_ratio4,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_c4_softmax_pool,prefill_compressor_ratio4,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,10024,True,True,"[0, 320]",NPU run failed (exit 1)
-prefill_c4_state_update,prefill_compressor_ratio4,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,7344,True,True,"[0, 304]",NPU run failed (exit 1)
-prefill_c4_write_map,prefill_compressor_ratio4,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5656,True,True,"[0, 288]",NPU run failed (exit 1)
-prefill_idx_c4_cache_write,prefill_indexer,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_c4_kv_hadamard,prefill_indexer,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.607,0.005,0.005,5248,True,True,"[0, 288]",
-prefill_idx_c4_kv_score_proj,prefill_indexer,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6864,True,True,"[0, 312]",NPU run failed (exit 1)
-prefill_idx_c4_rmsnorm_rope,prefill_indexer,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_c4_softmax_pool,prefill_indexer,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,11944,True,True,"[0, 328]",NPU run failed (exit 1)
-prefill_idx_c4_state_update,prefill_indexer,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,7416,True,True,"[0, 312]",NPU run failed (exit 1)
-prefill_idx_c4_write_map,prefill_indexer,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5696,True,True,"[0, 288]",NPU run failed (exit 1)
-prefill_idx_qr_hadamard_quant_aic,prefill_indexer,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_qr_hadamard_quant_aiv,prefill_indexer,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_qr_proj_aic,prefill_indexer,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_qr_proj_aiv,prefill_indexer,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_qr_rope,prefill_indexer,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_score_aic,prefill_indexer,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_score_aiv,prefill_indexer,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_score_init,prefill_indexer,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.626,0.005,0.005,5200,True,True,"[0, 256]",
-prefill_idx_score_out,prefill_indexer,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,4360,True,True,"[0, 256]",NPU run failed (exit 1)
-prefill_idx_topk,prefill_indexer,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6024,True,True,"[0, 280]",NPU run failed (exit 1)
-prefill_idx_topk_copy,prefill_indexer,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,4720,True,True,"[0, 272]",NPU run failed (exit 1)
-prefill_idx_weights_proj_aic,prefill_indexer,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_weights_proj_aiv,prefill_indexer,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_c4_cache_write,prefill_indexer_compressor,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_c4_kv_hadamard,prefill_indexer_compressor,vpto(phase5)[vmi-membar-vfoff],prefill,0,True,pass,0,0.0,,,0.005,0.533,0.005,0.005,5248,True,True,"[0, 288]",
-prefill_idx_c4_kv_score_proj,prefill_indexer_compressor,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6864,True,True,"[0, 312]",NPU run failed (exit 1)
-prefill_idx_c4_kv_test_extract,prefill_indexer_compressor,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_c4_rmsnorm_rope,prefill_indexer_compressor,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-prefill_idx_c4_softmax_pool,prefill_indexer_compressor,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,11944,True,True,"[0, 328]",NPU run failed (exit 1)
-prefill_idx_c4_state_update,prefill_indexer_compressor,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,7416,True,True,"[0, 312]",NPU run failed (exit 1)
-prefill_idx_c4_write_map,prefill_indexer_compressor,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5696,True,True,"[0, 288]",NPU run failed (exit 1)
-build_bias,prefill_sparse_attn,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6576,True,True,"[0, 272]",NPU run failed (exit 1)
-gather_kv,prefill_sparse_attn,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,6560,True,True,"[0, 288]",NPU run failed (exit 1)
-merge_norm,prefill_sparse_attn,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,11280,True,True,"[0, 288]",NPU run failed (exit 1)
-proj_a_mm,prefill_sparse_attn,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,5752,True,True,"[0, 272]",NPU run failed (exit 1)
-proj_b_act,prefill_sparse_attn,vpto(phase5)[vmi-membar-vfoff],prefill,0,False,fail,1,,,,,,0.005,0.005,7632,True,True,"[0, 288]",NPU run failed (exit 1)
-proj_b_mm,prefill_sparse_attn,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qk_pv_aic,prefill_sparse_attn,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-qk_pv_aiv,prefill_sparse_attn,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-quant,prefill_sparse_attn,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rope,prefill_sparse_attn,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
-rope_cs,prefill_sparse_attn,vpto(phase5),prefill,0,False,crash,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering failure)
+comb_sinkhorn,attention_swa,vpto[vmi-membar-vfoff],decode,1,True,pass,0,0.0,,,,2.7,,,,,,,
+hc_post,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+hc_pre_linear,attention_swa,vpto[vmi-membar-vfoff],decode,1,True,pass,0,,,,,0.388,,,,,,,
+hc_pre_rms,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,fail,-1,1000.0,,,,0.55,,,,,,,
+hc_pre_seed,attention_swa,vpto[vmi-membar-vfoff],decode,1,True,pass,0,0.0,,,,0.485,,,,,,,
+kv_proj_matmul,attention_swa,vpto[vmi-membar-vfoff],decode,1,True,pass,0,0.0,,,,0.512,,,,,,,
+kv_proj_seed,attention_swa,vpto[vmi-membar-vfoff],decode,1,True,pass,0,0.0,,,,3.665,,,,,,,
+kv_rms_norm_rope,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+merge_norm,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+mix_x,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+proj_a_mm,attention_swa,vpto[vmi-membar-vfoff],decode,1,True,pass,0,,,,,0.542,,,,,,,
+proj_b_act,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+proj_b_mm,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+q_rope_prepare,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+qk_pv_aic,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qk_pv_aiv,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qproj_dequant_rms_nope_rope,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qproj_matmul,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_proj_matmul,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_proj_seed,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_rms_norm_quant,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+quant,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rms_norm,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rope_cs,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+split_pre_post,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+swa_cache_insert_valid_bias,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+swa_gather_kv,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+swa_rope_step,attention_swa,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+kv_and_cache_write,indexer_compressor,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+kv_hadamard,indexer_compressor,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+kv_score_proj,indexer_compressor,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rmsnorm_rope,indexer_compressor,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+scatter_softmax_pool,indexer_compressor,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+hc_post,hc_post,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rms_norm,rms_norm,vpto[vmi-membar-vfoff],decode,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_c128_kv_finalize,prefill_compressor_ratio128,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_c128_kv_score_proj,prefill_compressor_ratio128,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_c128_norm_pad_init,prefill_compressor_ratio128,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_c128_rmsnorm_rope,prefill_compressor_ratio128,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_c128_softmax_pool,prefill_compressor_ratio128,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_c128_state_scatter_pre,prefill_compressor_ratio128,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_c128_write_map,prefill_compressor_ratio128,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+build_bias,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+comb_sinkhorn,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,True,pass,0,0.0,,,,2.7,,,,,,,
+gather_kv,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+hc_post_inactive_pad,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,not-exercised,-1,,,,,,,,,,,,not-exercised: kernel 'hc_post_inactive_pad' (fid 33) produced no dump
+hc_post_prefill,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+hc_pre_linear,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,True,pass,0,,,,,0.388,,,,,,,
+hc_pre_rms,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,fail,-1,1000.0,,,,0.55,,,,,,,
+hc_pre_seed,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,True,pass,0,0.0,,,,0.485,,,,,,,
+kv_proj_matmul,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,True,pass,0,,,,,0.49,,,,,,,
+kv_proj_seed,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,True,pass,0,0.0,,,,3.665,,,,,,,
+kv_rms_norm_rope,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+merge_norm,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+mix_x,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+prefill_swa_cache_write,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_swa_dummy_cmp_table,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_swa_empty_cmp_meta,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_swa_window_indices,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+proj_a_mm,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,True,pass,0,,,,,0.542,,,,,,,
+proj_b_act,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+proj_b_mm,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+q_rope_prepare,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+qk_pv_aic,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qk_pv_aiv,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qkv_rope_rows,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qproj_dequant_rms_nope_rope,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qproj_matmul,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_proj_matmul,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_proj_seed,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_rms_norm_quant,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+quant,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rms_norm,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rope,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rope_cs,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+split_pre_post,prefill_attention_swa,vpto[vmi-membar-vfoff],prefill,1,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+attention_csa,attention_csa,vpto[vmi-membar-vfoff],decode,5,False,capture-fail,-1,,,,,,,,,,,,capture failed (exit 1): -----------------------
+kv_score_proj,compressor,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rmsnorm_rope_cache_write,compressor,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+scatter_softmax_pool,compressor,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+ffn_norm,gate,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+gate_aic,gate,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+gate_aiv,gate,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+gate_pre_route,gate,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+route_hash,gate,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+x_norm_quant,gate,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+mtp_projection_linear_aic,mtp_projection,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+mtp_projection_linear_aiv,mtp_projection,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+mtp_projection_norm,mtp_projection,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+mtp_projection_output,mtp_projection,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+mtp_projection_quant,mtp_projection,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+mtp_projection_rms,mtp_projection,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+exp_gate_mm,expert_routed,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+exp_gate_up_act,expert_routed,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+exp_h_q,expert_routed,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+exp_up_mm,expert_routed,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+exp_w2_act,expert_routed,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+exp_w2_mm,expert_routed,vpto[vmi-membar-vfoff],decode,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+build_bias,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+comb_sinkhorn,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,True,pass,0,0.0,,,,2.7,,,,,,,
+gather_kv,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+hc_post_inactive_pad,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,not-exercised,-1,,,,,,,,,,,,not-exercised: kernel 'hc_post_inactive_pad' (fid 57) produced no dump
+hc_post_prefill,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+hc_pre_linear,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,True,pass,0,,,,,0.388,,,,,,,
+hc_pre_rms,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,fail,-1,1000.0,,,,0.55,,,,,,,
+hc_pre_seed,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,True,pass,0,0.0,,,,0.485,,,,,,,
+kv_proj_matmul,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,True,pass,0,,,,,0.49,,,,,,,
+kv_proj_seed,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,True,pass,0,0.0,,,,3.665,,,,,,,
+kv_rms_norm_rope,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+merge_norm,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+mix_x,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+prefill_c4_cache_write,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_c4_kv_score_proj,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_c4_rmsnorm_rope,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_c4_softmax_pool,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_c4_state_update,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_c4_write_map,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_csa_cache_write,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_csa_idx_halfrope,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_csa_sparse_idx_tile,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_cache_write,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_kv_hadamard,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_kv_score_proj,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_rmsnorm_rope,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_softmax_pool,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_state_update,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_write_map,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_qr_hadamard_quant_aic,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_qr_hadamard_quant_aiv,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_qr_proj_aic,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_qr_proj_aiv,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_qr_rope,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_score_aic,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_score_aiv,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_score_init,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_score_out,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_topk,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_weights_proj_aic,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_weights_proj_aiv,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+proj_a_mm,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,True,pass,0,,,,,0.542,,,,,,,
+proj_b_act,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+proj_b_mm,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+q_rope_prepare,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+qk_pv_aic,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qk_pv_aiv,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qkv_rope_rows,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qproj_dequant_rms_nope_rope,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qproj_matmul,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_proj_matmul,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_proj_seed,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_rms_norm_quant,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+quant,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rms_norm,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+rope,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,True,pass,0,0.0,,,,0.643,,,,,,,
+rope_cs,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,True,pass,0,0.0,,,,399.787,,,,,,,
+split_pre_post,prefill_attention_csa,vpto[vmi-membar-vfoff],prefill,5,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+csa_slots_build_valid_qk_plan,sparse_attn,vpto[vmi-membar-vfoff],decode,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+kv_touch,sparse_attn,vpto[vmi-membar-vfoff],decode,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+merge_norm,sparse_attn,vpto[vmi-membar-vfoff],decode,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+proj_a_mm,sparse_attn,vpto[vmi-membar-vfoff],decode,6,True,pass,0,,,,,0.542,,,,,,,
+proj_b_act,sparse_attn,vpto[vmi-membar-vfoff],decode,6,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+proj_b_mm,sparse_attn,vpto[vmi-membar-vfoff],decode,6,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+qk_pv_aic,sparse_attn,vpto[vmi-membar-vfoff],decode,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qk_pv_aiv,sparse_attn,vpto[vmi-membar-vfoff],decode,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+quant,sparse_attn,vpto[vmi-membar-vfoff],decode,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rope_cs,sparse_attn,vpto[vmi-membar-vfoff],decode,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+comb_sinkhorn,hc_pre,vpto[vmi-membar-vfoff],decode,6,True,pass,0,0.0,,,,2.7,,,,,,,
+hc_pre_linear,hc_pre,vpto[vmi-membar-vfoff],decode,6,True,pass,0,,,,,0.388,,,,,,,
+hc_pre_rms,hc_pre,vpto[vmi-membar-vfoff],decode,6,False,fail,-1,1000.0,,,,0.55,,,,,,,
+hc_pre_seed,hc_pre,vpto[vmi-membar-vfoff],decode,6,True,pass,0,0.0,,,,0.485,,,,,,,
+mix_x,hc_pre,vpto[vmi-membar-vfoff],decode,6,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+split_pre_post,hc_pre,vpto[vmi-membar-vfoff],decode,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_c4_cache_write,prefill_compressor_ratio4,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_c4_kv_score_proj,prefill_compressor_ratio4,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_c4_rmsnorm_rope,prefill_compressor_ratio4,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_c4_softmax_pool,prefill_compressor_ratio4,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_c4_state_update,prefill_compressor_ratio4,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_c4_write_map,prefill_compressor_ratio4,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_cache_write,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_kv_hadamard,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_kv_score_proj,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_rmsnorm_rope,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_softmax_pool,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_state_update,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_write_map,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_qr_hadamard_quant_aic,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_qr_hadamard_quant_aiv,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_qr_proj_aic,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_qr_proj_aiv,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_qr_rope,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_score_aic,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_score_aiv,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_score_init,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_score_out,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_topk,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_topk_copy,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_weights_proj_aic,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_weights_proj_aiv,prefill_indexer,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_cache_write,prefill_indexer_compressor,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_kv_hadamard,prefill_indexer_compressor,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_kv_score_proj,prefill_indexer_compressor,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_kv_test_extract,prefill_indexer_compressor,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_rmsnorm_rope,prefill_indexer_compressor,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_softmax_pool,prefill_indexer_compressor,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_state_update,prefill_indexer_compressor,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_idx_c4_write_map,prefill_indexer_compressor,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+build_bias,prefill_sparse_attn,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+gather_kv,prefill_sparse_attn,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+merge_norm,prefill_sparse_attn,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+proj_a_mm,prefill_sparse_attn,vpto[vmi-membar-vfoff],prefill,6,True,pass,0,,,,,0.542,,,,,,,
+proj_b_act,prefill_sparse_attn,vpto[vmi-membar-vfoff],prefill,6,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+proj_b_mm,prefill_sparse_attn,vpto[vmi-membar-vfoff],prefill,6,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+qk_pv_aic,prefill_sparse_attn,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qk_pv_aiv,prefill_sparse_attn,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+quant,prefill_sparse_attn,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rope,prefill_sparse_attn,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rope_cs,prefill_sparse_attn,vpto[vmi-membar-vfoff],prefill,6,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+attention_hca,attention_hca,vpto[vmi-membar-vfoff],decode,7,False,capture-fail,-1,,,,,,,,,,,,capture failed (exit 1): oes not dominate this use
+idx_qr_proj_dequant,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+idx_qr_proj_matmul,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+kv_and_cache_write,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+kv_hadamard,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+kv_score_proj,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_hadamard_matmul,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_hadamard_quant,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_rope,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rmsnorm_rope,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+scatter_softmax_pool,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+score_mat,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+score_reduce,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+topk,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+weights_proj,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+weights_proj_reduce,indexer,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+hc_head_linear,hc_head,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+hc_head_pre_fused,hc_head,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+hc_head_reduce,hc_head,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+hc_head_rms,hc_head,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+hc_head_seed,hc_head,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+kv_proj_matmul,qkv_proj_rope,vpto[vmi-membar-vfoff],decode,7,True,pass,0,,,,,0.49,,,,,,,
+kv_proj_seed,qkv_proj_rope,vpto[vmi-membar-vfoff],decode,7,True,pass,0,0.0,,,,3.665,,,,,,,
+kv_rms_norm_rope,qkv_proj_rope,vpto[vmi-membar-vfoff],decode,7,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+q_rope_prepare,qkv_proj_rope,vpto[vmi-membar-vfoff],decode,7,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+qproj_dequant_rms_nope_rope,qkv_proj_rope,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qproj_matmul,qkv_proj_rope,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_proj_matmul,qkv_proj_rope,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_proj_seed,qkv_proj_rope,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_rms_norm_quant,qkv_proj_rope,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+sh_gate_mm,expert_shared,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+sh_gate_up_act_q,expert_shared,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+sh_up_mm,expert_shared,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+sh_w2_act,expert_shared,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+sh_w2_mm,expert_shared,vpto[vmi-membar-vfoff],decode,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+build_bias,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+comb_sinkhorn,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,True,pass,0,0.0,,,,2.7,,,,,,,
+gather_kv,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+hc_post_inactive_pad,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,not-exercised,-1,,,,,,,,,,,,not-exercised: kernel 'hc_post_inactive_pad' (fid 38) produced no dump
+hc_post_prefill,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+hc_pre_linear,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,True,pass,0,,,,,0.388,,,,,,,
+hc_pre_rms,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,fail,-1,1000.0,,,,0.55,,,,,,,
+hc_pre_seed,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,True,pass,0,0.0,,,,0.485,,,,,,,
+kv_proj_matmul,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,True,pass,0,,,,,0.49,,,,,,,
+kv_proj_seed,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,True,pass,0,0.0,,,,3.665,,,,,,,
+kv_rms_norm_rope,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+merge_norm,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+mix_x,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+prefill_hca_c128_kv_finalize,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_c128_kv_score_proj,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_c128_norm_pad_init,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_c128_rmsnorm_rope,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_c128_softmax_pool,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_c128_state_scatter_pre,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_c128_write_map,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_cache_write,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+prefill_hca_sparse_indices,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+proj_a_mm,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,True,pass,0,,,,,0.542,,,,,,,
+proj_b_act,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+proj_b_mm,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+q_rope_prepare,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,npu-run-fail,-1,,,,,,,,,,,,NPU run failed (exit 1)
+qk_pv_aic,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qk_pv_aiv,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qkv_rope_rows,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qproj_dequant_rms_nope_rope,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qproj_matmul,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_proj_matmul,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_proj_seed,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+qr_rms_norm_quant,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+quant,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rms_norm,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rope,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+rope_cs,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f
+split_pre_post,prefill_attention_hca,vpto[vmi-membar-vfoff],prefill,7,False,lowering-fail,-1,,,,,,,,,,,,vpto_run exited 1 without result.json (likely ptoas/bisheng lowering f

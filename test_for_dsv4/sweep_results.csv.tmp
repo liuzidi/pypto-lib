@@ -1,0 +1,2 @@
+kernel,pass,compare_status,exit_code,max_diff,n_over,n_total,threshold,timing_ms,fatobj_bytes,error,elapsed_s
+hc_head_linear,True,pass,0,0.0,,,,0.407,,,17.7
