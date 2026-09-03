@@ -104,6 +104,37 @@ stages after their respective compile path. The detailed sequence and
 configuration groups are documented in
 [Compile and Runtime Workflow](compile-runtime-workflow.md).
 
+## Select the kernel backend
+
+The default InCore code-generation backend is EmitC. Select VPTO for one run
+with the ``kernel_backend`` argument:
+
+```python
+result = run_jit(
+    fn=hello_world,
+    specs=build_specs(),
+    golden_fn=golden_hello_world,
+    kernel_backend="vpto",
+    runtime_cfg={"platform": "a5", "device_id": 0},
+)
+```
+
+To exercise an existing model script without adding a script-specific CLI
+option, set the environment override:
+
+```bash
+PYPTO_KERNEL_BACKEND=vpto \
+  python models/deepseek_v4_pro/hc_post.py -p a5 -d 0
+```
+
+VPTO mode requires a PTOAS build containing
+``--vpto-emit-merged-device-only``. PyPTO invokes that mode and emits one
+precompiled device ELF per InCore kernel. The generated orchestration,
+signatures, task graph, ``CoreCallable`` construction, and Simpler Worker path
+remain the same as EmitC; pypto-lib does not generate a separate manifest or
+launcher. Kernels that the selected PTOAS revision cannot lower still fail at
+the PTOAS compilation stage.
+
 ## Validation
 
 Every `TensorSpec` marked as an output is compared with the corresponding

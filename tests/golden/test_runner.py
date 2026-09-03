@@ -27,6 +27,7 @@ from golden.runner import (
     _backend_for_platform,
     _bench_loop_sizes,
     _format_stale_paths,
+    _kernel_backend,
     _maybe_reload_l3,
     _report_effective,
     _report_l3_detail,
@@ -920,8 +921,10 @@ class TestConfigForwarding:
             captured.update(kwargs)
             return fake
 
-        with patch("pypto.ir.compile", side_effect=fake_compile), \
-             patch("pypto.runtime.execute_compiled"):
+        with (
+            patch("pypto.ir.compile", side_effect=fake_compile),
+            patch("pypto.runtime.execute_compiled"),
+        ):
             r = run(
                 program=object(),
                 specs=three_kinds_specs,
@@ -931,6 +934,40 @@ class TestConfigForwarding:
         assert r.passed, f"unexpected failure: {r.error}"
         assert captured["dump_passes"] is False
         assert captured["profiling"] is True
+        assert captured["kernel_backend"] == "emitc"
+
+    def test_kernel_backend_forwarded_to_ir_compile(self, three_kinds_specs, tmp_path):
+        """An explicit VPTO selection reaches PyPTO compilation."""
+        compiled_dir = tmp_path / "build"
+        compiled_dir.mkdir()
+        fake = _FakeCompiled(compiled_dir)
+        captured: dict = {}
+
+        def fake_compile(_program, **kwargs):
+            captured.update(kwargs)
+            return fake
+
+        with patch("pypto.ir.compile", side_effect=fake_compile), \
+             patch("pypto.runtime.execute_compiled"):
+            result = run(
+                program=object(),
+                specs=three_kinds_specs,
+                kernel_backend="vpto",
+            )
+
+        assert result.passed, f"unexpected failure: {result.error}"
+        assert captured["kernel_backend"] == "vpto"
+
+    def test_kernel_backend_environment_default(self, monkeypatch):
+        """The environment can select VPTO for unchanged model scripts."""
+        monkeypatch.setenv("PYPTO_KERNEL_BACKEND", "vpto")
+        assert _kernel_backend(None) == "vpto"
+        assert _kernel_backend("emitc") == "emitc"
+
+    def test_kernel_backend_rejects_unknown_value(self):
+        """Invalid backend names fail before compilation."""
+        with pytest.raises(ValueError, match="kernel_backend"):
+            _kernel_backend("unknown")
 
     def test_runtime_cfg_forwarded_to_execute_compiled(
         self, three_kinds_specs, tmp_path,
