@@ -12,6 +12,7 @@
 Public entry points: :func:`run` and :func:`run_jit`.
 """
 
+import os
 import statistics
 import time
 from collections.abc import Callable
@@ -43,6 +44,14 @@ class RunResult:
         if self.error:
             msg += f": {self.error}"
         return msg + time_str
+
+
+def _kernel_backend(explicit: str | None) -> str:
+    """Resolve the PyPTO kernel backend from an argument or the environment."""
+    backend = explicit or os.environ.get("PYPTO_KERNEL_BACKEND", "emitc")
+    if backend not in {"emitc", "vpto"}:
+        raise ValueError(f"kernel_backend must be 'emitc' or 'vpto', got {backend!r}")
+    return backend
 
 
 def _save_tensors(dest_dir: Path, tensors: dict[str, torch.Tensor]) -> None:
@@ -1197,6 +1206,7 @@ def run(
     compile_only: bool = False,
     runtime_dir: str | None = None,
     save_data: bool = False,
+    kernel_backend: str | None = None,
 ) -> RunResult:
     """Compile *program*, run on device, and validate against golden.
 
@@ -1231,13 +1241,21 @@ def run(
             Defaults to False, skipping the on-disk ``.pt`` snapshot;
             validation still runs against the in-memory golden. Enable it
             when you need to replay the exact inputs/outputs later.
+        kernel_backend: InCore code-generation backend, either ``"emitc"``
+            or ``"vpto"``. ``None`` reads ``PYPTO_KERNEL_BACKEND`` and falls
+            back to ``"emitc"``. VPTO requires a PTOAS build that supports
+            merged device ELF output.
 
     Returns:
         :class:`RunResult`.
     """
     from pypto import ir
 
-    compile_cfg = compile_cfg or {}
+    compile_cfg = dict(compile_cfg or {})
+    if kernel_backend is not None:
+        compile_cfg["kernel_backend"] = _kernel_backend(kernel_backend)
+    else:
+        compile_cfg.setdefault("kernel_backend", _kernel_backend(None))
     runtime_cfg = dict(runtime_cfg or {})  # copy: we pop harness-only keys
     compare_fn = compare_fn or {}
 
@@ -1380,6 +1398,7 @@ def run_jit(
     compile_only: bool = False,
     runtime_dir: str | None = None,
     save_data: bool = False,
+    kernel_backend: str | None = None,
 ) -> RunResult:
     """JIT-flavoured :func:`run`: compile via ``@pl.jit``, then same harness.
 
@@ -1417,11 +1436,19 @@ def run_jit(
             Defaults to False, skipping the on-disk ``.pt`` snapshot;
             validation still runs against the in-memory golden. Enable it
             when you need to replay the exact inputs/outputs later.
+        kernel_backend: InCore code-generation backend, either ``"emitc"``
+            or ``"vpto"``. ``None`` reads ``PYPTO_KERNEL_BACKEND`` and falls
+            back to ``"emitc"``. VPTO requires a PTOAS build that supports
+            merged device ELF output.
 
     Returns:
         :class:`RunResult`.
     """
-    compile_cfg = compile_cfg or {}
+    compile_cfg = dict(compile_cfg or {})
+    if kernel_backend is not None:
+        compile_cfg["kernel_backend"] = _kernel_backend(kernel_backend)
+    else:
+        compile_cfg.setdefault("kernel_backend", _kernel_backend(None))
     runtime_cfg = dict(runtime_cfg or {})  # copy: we pop harness-only keys
     compare_fn = compare_fn or {}
 
